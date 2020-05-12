@@ -6,7 +6,7 @@
 
         post {
             always {
-                junit 'target/failsafe-reports/**/*IT.xml'
+                junit '**/*IT.xml'
             }
         }
     }

@@ -7,7 +7,7 @@
 
                 post {
                     always {
-                        junit 'target/surefire-reports/**/*Test.xml'
+                        junit '**/*Test.xml'
                     }
                 }
             }
@@ -20,7 +20,7 @@
 
                 post {
                     always {
-                        junit 'target/failsafe-reports/**/*IT.xml'
+                        junit '**/*IT.xml'
                     }
                 }
             }
