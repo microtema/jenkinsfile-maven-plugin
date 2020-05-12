@@ -1,5 +1,3 @@
-options {
-    disableConcurrentBuilds()
-    timeout(time: 30, unit: 'MINUTES')
-    buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '10'))
-}
+triggers {
+        upstream(upstreamProjects: "@UPSTREAM_PROJECTS@", threshold: hudson.model.Result.SUCCESS)
+    }

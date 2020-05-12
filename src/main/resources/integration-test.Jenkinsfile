@@ -1,12 +1,12 @@
-stage('Test') {
+    stage('Test') {
 
-    steps {
-        sh 'mvn test-compile failsafe:integration-test $MAVEN_ARGS'
-    }
+        steps {
+            sh 'mvn test-compile failsafe:integration-test $MAVEN_ARGS'
+        }
 
-    post {
-        always {
-            junit 'target/failsafe-reports/**/*IT.xml'
+        post {
+            always {
+                junit 'target/failsafe-reports/**/*IT.xml'
+            }
         }
     }
-}

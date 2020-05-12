@@ -1,15 +1,16 @@
-stage('Pull Request [PROD]') {
+    stage('Pull Request [PROD]') {
 
-    when {
-        allOf {
-            branch 'master'
-            expression {
-                env.ABORTED != 'true'
+        when {
+            allOf {
+                branch 'master'
+                expression {
+                    env.ABORTED != 'true'
+                }
             }
         }
-    }
 
-    parallel {
-        @STAGES@
+        parallel {
+
+@STAGES@
+        }
     }
-}

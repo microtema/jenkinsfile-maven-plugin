@@ -10,14 +10,15 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
 
 @Mojo(name = "generate", defaultPhase = LifecyclePhase.COMPILE)
 public class JenkinsfileGeneratorMojo extends AbstractMojo {
@@ -63,12 +64,13 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     public void execute() throws MojoExecutionException, MojoFailureException {
 
-        String artifactId = project != null ? project.getArtifactId() : null;
-        MavenProject parent = project.getParent();
+
+        MavenProject parent = project != null ? project.getParent() : null;
         if (parent != null) {
             project = parent;
         }
 
+        String artifactId = project != null ? project.getArtifactId() : null;
         String rootPath = getRootPath();
 
         getLog().info("+----------------------------------+");
@@ -80,8 +82,13 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         String options = getJenkinsStage("options");
         String triggers = buildTriggers();
         String stages = buildStages();
-        String post = getJenkinsStage("post");
-        String pipeline = generateClosure("pipeline", null, agent, environment, options, triggers, stages, post);
+        String pipeline = getJenkinsStage("pipeline");
+
+        pipeline = pipeline.replace("@AGENT@", agent)
+                .replace("@ENVIRONMENT@", environment)
+                .replace("@OPTIONS@", options)
+                .replace("@TRIGGERS@", triggers)
+                .replace("@STAGES@", stages);
 
         try (PrintWriter out = new PrintWriter(rootPath + "/Jenkinsfile")) {
             out.println(pipeline);
@@ -91,6 +98,10 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     }
 
     String getRootPath() {
+
+        if (project == null) {
+            return ".";
+        }
 
         return project.getBasedir().getPath();
     }
@@ -102,13 +113,47 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         List<String> stages = Arrays.asList("initialize", "versioning", "compile", test, "sonar",
                 "maven-build", "security", "docker-build", "tag", "publish", "deployment", "aqua", "promote", "deployment-prod");
 
-        String[] objects = new String[stages.size()];
+        StringBuilder body = new StringBuilder();
 
-        for (int index = 0; index < stages.size(); index++) {
-            objects[index] = getJenkinsStage(stages.get(index));
+        for (String stage : stages) {
+
+            String stageTemplate = getJenkinsStage(stage);
+
+            if (StringUtils.isNotEmpty(stageTemplate)) {
+                body.append("\n");
+                body.append(paddLine(stageTemplate, 6));
+            }
         }
 
-        return generateClosure("stages", null, objects);
+        return body.toString();
+    }
+
+    String paddLine(String template, int padding) {
+
+        BufferedReader reader = new BufferedReader(new StringReader(template));
+        StringBuilder builder = new StringBuilder();
+
+        String paddingString = "";
+        while (padding-- > 0) {
+            paddingString = " " + paddingString;
+        }
+
+        try {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(paddingString).append(line).append("\n");
+            }
+
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        } finally {
+            try {
+                reader.close();
+            } catch (IOException e) {
+            }
+        }
+
+        return builder.toString();
     }
 
     String getTestStageName() {
@@ -122,9 +167,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String buildTriggers() {
 
-        if (upstreamProjects.length == 0) {
-            return null;
-        }
+        String template = getJenkinsStage("triggers");
 
         StringBuilder upstreamProjectsParam = new StringBuilder();
 
@@ -140,11 +183,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             }
         }
 
-        String body = "upstream(\n" +
-                "  upstreamProjects: \"" + upstreamProjectsParam + "\",\n" +
-                "  threshold: hudson.model.Result.SUCCESS)\n";
-
-        return generateClosure("triggers", "", body);
+        return template.replace("@UPSTREAM_PROJECTS@", upstreamProjectsParam.toString());
     }
 
     String generateClosure(String tag, String name, String... bodies) {
@@ -185,15 +224,11 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return template.replaceFirst("sonar:sonar", "sonar:sonar" + excludes);
     }
 
-    String fixupInitializeStage(String template) {
-
-        return template.replaceFirst("@BOOTSTRAP_URL@", maskEnvironmentVariable(bootstrapUrl));
-    }
-
     String fixupEnvironment(String template) {
 
         return template.replaceFirst("@BASE_NAMESPACE@", maskEnvironmentVariable(baseNamespace))
-                .replaceFirst("@APP@", maskEnvironmentVariable(appName));
+                .replaceFirst("@APP@", maskEnvironmentVariable(appName))
+                .replaceFirst("@BOOTSTRAP_URL@", maskEnvironmentVariable(bootstrapUrl));
     }
 
     String fixupAquaStage(String template) {
@@ -273,8 +308,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 return fixupEnvironment(template);
             case "sonar":
                 return fixSonarStage(template);
-            case "initialize":
-                return fixupInitializeStage(template);
 
             case "docker-build":
             case "deployment":
