@@ -123,8 +123,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         String test = getTestStageName();
 
-        List<String> stages = Arrays.asList("initialize", "versioning", "compile", test, "sonar",
-                "maven-build", "security", "docker-build", "tag", "publish", "deployment", "aqua",
+        List<String> stages = Arrays.asList("initialize", "versioning", "compile", test, "maven-build",
+                "sonar", "security", "docker-build", "tag", "publish", "deployment", "aqua",
                 "promote", "deployment-prod");
 
         StringBuilder body = new StringBuilder();
