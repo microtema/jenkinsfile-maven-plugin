@@ -61,20 +61,6 @@ public class JenkinsfileGeneratorMojoTest {
     }
 
     @Test
-    public void generateClosure() {
-
-        assertEquals("stage {\n" +
-                "}", sut.generateClosure("stage", null, ""));
-    }
-
-    @Test
-    public void generateClosureWithName() {
-
-        assertEquals("stage('Test') {\n" +
-                "}", sut.generateClosure("stage", "Test", ""));
-    }
-
-    @Test
     public void fixSonarStage() {
 
         String stage = sut.fixSonarStage("mvn sonar:sonar -Dsonar.branch.name=$BRANCH_NAME $MAVEN_ARGS");

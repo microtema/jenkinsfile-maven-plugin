@@ -64,7 +64,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     public void execute() throws MojoExecutionException, MojoFailureException {
 
-
         MavenProject parent = project != null ? project.getParent() : null;
         if (parent != null) {
             project = parent;
@@ -111,7 +110,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         String test = getTestStageName();
 
         List<String> stages = Arrays.asList("initialize", "versioning", "compile", test, "sonar",
-                "maven-build", "security", "docker-build", "tag", "publish", "deployment", "aqua", "promote", "deployment-prod");
+                "maven-build", "security", "docker-build", "tag", "publish", "deployment", "aqua",
+                "promote", "deployment-prod");
 
         StringBuilder body = new StringBuilder();
 
@@ -150,6 +150,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             try {
                 reader.close();
             } catch (IOException e) {
+                // ignore this exception
             }
         }
 
@@ -171,14 +172,14 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         StringBuilder upstreamProjectsParam = new StringBuilder();
 
-        for (int index = 0; index < this.upstreamProjects.length; index++) {
+        for (int index = 0; index < upstreamProjects.length; index++) {
 
-            String project = this.upstreamProjects[index];
+            String project = upstreamProjects[index];
 
             upstreamProjectsParam.append(project);
             upstreamProjectsParam.append("/${env.BRANCH_NAME.replaceAll('/', '%2F')}");
 
-            if (index < this.upstreamProjects.length - 1) {
+            if (index < upstreamProjects.length - 1) {
                 upstreamProjectsParam.append(",");
             }
         }
@@ -186,32 +187,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return template.replace("@UPSTREAM_PROJECTS@", upstreamProjectsParam.toString());
     }
 
-    String generateClosure(String tag, String name, String... bodies) {
-
-        StringBuilder builder = new StringBuilder();
-
-        builder.append(tag);
-        if (StringUtils.isNotEmpty(name)) {
-            builder.append("('" + name + "')");
-        }
-        builder.append(" {").append("\n");
-
-        for (String body : bodies) {
-
-            if (StringUtils.isNotEmpty(body)) {
-                builder.append(body);
-                builder.append("\n");
-            }
-        }
-
-        builder.append("}");
-
-        return builder.toString();
-    }
-
     String fixSonarStage(String template) {
 
-        if (this.sonarExcludes.length == 0) {
+        if (sonarExcludes.length == 0) {
             return template;
         }
 
@@ -237,8 +215,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 .replaceFirst("@AQUA_PRODUCT_ID@", maskEnvironmentVariable(aquaProductId))
                 .replaceFirst("@AQUA_RELEASE@", maskEnvironmentVariable(aquaRelease))
                 .replaceFirst("@AQUA_LEVEL@", maskEnvironmentVariable(aquaLevel))
-                .replaceFirst("@INTEGRATION_TEST_AQUA_FOLDER_ID@", maskEnvironmentVariable(aquaITFolderId))
-                .replaceFirst("@JUNIT_TEST_AQUA_FOLDER_ID@", maskEnvironmentVariable(aquaJunitFolderId));
+                .replaceFirst("@AQUA_JUNIT_TEST_FOLDER_ID@", maskEnvironmentVariable(aquaJunitFolderId))
+                .replaceFirst("@AQUA_INTEGRATION_TEST_FOLDER_ID@", maskEnvironmentVariable(aquaITFolderId));
+
     }
 
     String fixupDeploymentProd(String template) {

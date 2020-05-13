@@ -5,17 +5,10 @@
             AQUA_PRODUCT_ID = @AQUA_PRODUCT_ID@
             AQUA_RELEASE = @AQUA_RELEASE@
             AQUA_LEVEL = @AQUA_LEVEL@
-            JUNIT_TEST_AQUA_FOLDER_ID = @JUNIT_TEST_AQUA_FOLDER_ID@
-            INTEGRATION_TEST_AQUA_FOLDER_ID = @INTEGRATION_TEST_AQUA_FOLDER_ID@
+            AQUA_JUNIT_TEST_FOLDER_ID = @AQUA_JUNIT_TEST_FOLDER_ID@
+            AQUA_INTEGRATION_TEST_FOLDER_ID = @AQUA_INTEGRATION_TEST_FOLDER_ID@
         }
 
-        when {
-            anyOf {
-                branch 'develop'
-                branch 'release-*'
-                branch 'master'
-            }
-        }
         steps {
 
             script {
