@@ -1,6 +1,7 @@
     stage('Aqua Reports') {
 
         environment {
+            AQUA_URL = @AQUA_URL@
             AQUA_PROJECT_ID = @AQUA_PROJECT_ID@
             AQUA_PRODUCT_ID = @AQUA_PRODUCT_ID@
             AQUA_RELEASE = @AQUA_RELEASE@
@@ -25,7 +26,7 @@
                     -H "X-ateststufe: ${testType}" \
                     -H "X-commit: ${env.GIT_COMMIT}" \
                     --data-binary @${file.path} \
-                    "http://ju2aqua.ju2aqua-itu.svc.cluster.local/stream/"
+                    "${env.AQUA_URL}"
                     """, returnStdout: true)
 
                     if (response != 'OK') {

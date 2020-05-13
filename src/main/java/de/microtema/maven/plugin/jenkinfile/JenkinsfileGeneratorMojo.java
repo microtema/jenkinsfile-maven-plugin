@@ -41,6 +41,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "aqua-project-id")
     String aquaProjectId;
 
+    @Parameter(property = "aqua-url")
+    String aquaUrl;
+
     @Parameter(property = "aqua-product-id")
     String aquaProductId;
 
@@ -223,6 +226,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     String fixupAquaStage(String template) {
 
         return template.replaceFirst("@AQUA_PROJECT_ID@", maskEnvironmentVariable(aquaProjectId))
+                .replaceFirst("@AQUA_URL@", maskEnvironmentVariable(aquaUrl))
                 .replaceFirst("@AQUA_PRODUCT_ID@", maskEnvironmentVariable(aquaProductId))
                 .replaceFirst("@AQUA_RELEASE@", maskEnvironmentVariable(aquaRelease))
                 .replaceFirst("@AQUA_LEVEL@", maskEnvironmentVariable(aquaLevel))
