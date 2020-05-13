@@ -27,7 +27,7 @@ public class JenkinsfileGeneratorMojoTest {
         sut = new JenkinsfileGeneratorMojo();
 
         dockerFile.delete();
-        // jenkinsfile.delete();
+        jenkinsfile.delete();
     }
 
     @Test
