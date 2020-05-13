@@ -32,39 +32,326 @@ Reducing Boilerplate Code with jenkinnsfile maven plugin
     </plugin>
 </plugins>
 ```
-    
-## How to use with annotations?
 
-*  @Model Person person; // create person instance within filled required properties
-*  @Models Collection< Person > persons; // create a List of person instances with random **[1..10]** size
-  
-## How to use with annotations but with custom builder?
+## Output
+```
+pipeline {
 
-*  @Resource PersonModelBuilder builder; //custom model builder
-*  @Model Person person; // create person instance within filled required properties
-*  @Models Collection< Person > persons; // create a List of person instances with random **[1..10]** size
+    agent {
+        label 'mvn8'
+    }
 
-## How Annotated fields are injected?
+    environment {
+        APP = ''
+        BASE_NAMESPACE = ''
 
->  @Before public void setUp() {
->      FieldInjectionUtil.injectFields(this);
->  }
+        VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()
+        CURRENT_TIME = sh(script: 'date +%Y-%m-%d-%H-%M', returnStdout: true).trim()
+        CHANGE_AUTHOR_EMAIL = sh(script: 'git --no-pager show -s --format=\'%ae\'', returnStdout: true).trim()
 
-## Supported out of the box types
+        // NOTE: If you use the same Jenkinsfile in multiple CI-Servers
+        //       we need a conditional deployment, only on different  stages
+        DEPLOYABLE = sh(script: 'oc whoami', returnStdout: true).trim().startsWith("system:serviceaccount:${env.BASE_NAMESPACE}")
 
-* @Model Byte byte;
-* @Model Boolean boolean;
-* @Model Character character;
-* @Model Date date;
-* @Model BigDecimal bigDecimal;
-* @Model Double double;
-* @Model Float float;
-* @Model Integer integer;
-* @Model Long long;
-* @Model String string;
-* @Model URL url;
-* @Model Map<K, V> map;
-* @Model Enum enum;
+        BOOTSTRAP_URL = ''
+        MAVEN_ARGS = '-s ./bootstrap/settings.xml'
+    }
+
+    options {
+        disableConcurrentBuilds()
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '10'))
+    }
+
+    triggers {
+        upstream(upstreamProjects: "", threshold: hudson.model.Result.SUCCESS)
+    }
+
+    stages {
+        
+          stage('Initialize') {
+      
+              steps {
+                  script {
+                      dir('bootstrap') {
+                          try {
+                              git branch: env.BRANCH_NAME, url: env.BOOTSTRAP_URL, credentialsId: 'SCM_CREDENTIALS'
+                          } catch (e) {
+                              sh "echo unable to find branch! ${e}  retry with develop branch..."
+                              git branch: 'develop', url: env.BOOTSTRAP_URL, credentialsId: 'SCM_CREDENTIALS'
+                          }
+                      }
+                      pipelineUtils = load './bootstrap/jenkins/pipeline-utils.groovy'
+                  }
+      
+                  sh 'whoami'
+                  sh 'oc whoami'
+                  sh 'mvn -version'
+                  sh 'echo commit-id: $GIT_COMMIT'
+                  sh 'echo change author: $CHANGE_AUTHOR_EMAIL'
+      
+                  sh 'echo project version: $VERSION'
+                  sh 'echo current time: $CURRENT_TIME'
+                  sh 'echo deployable: $DEPLOYABLE'
+              }
+          }
+
+          stage('Versioning') {
+      
+              when {
+                  anyOf {
+                      branch 'release-*'
+                      branch 'bugfix-*'
+                  }
+              }
+      
+              steps {
+                  sh 'mvn release:update-versions -DdevelopmentVersion=2.1.0-SNAPSHOT $MAVEN_ARGS'
+                  sh 'mvn versions:set -DnewVersion=$VERSION-$CURRENT_TIME-$BUILD_NUMBER $MAVEN_ARGS'
+              }
+          }
+
+          stage('Compile') {
+              steps {
+                  script {
+                      sh 'mvn compile -U $MAVEN_ARGS'
+                  }
+              }
+          }
+
+          stage('Test') {
+              steps {
+                  sh 'mvn test $MAVEN_ARGS'
+              }
+      
+              post {
+                  always {
+                      junit '**/*Test.xml'
+                  }
+              }
+          }
+
+          stage('Sonar Reports') {
+              steps {
+                  sh 'mvn sonar:sonar -Dsonar.branch.name=$BRANCH_NAME $MAVEN_ARGS'
+              }
+          }
+
+          stage('Build [Maven-Artifact]') {
+              steps {
+                 sh 'mvn install -Dmaven.test.skip=true -DskipTests=true $MAVEN_ARGS'
+              }
+          }
+
+          stage('Security Check') {
+              steps {
+                  sh 'mvn dependency-check:help -P security $MAVEN_ARGS'
+              }
+          }
+
+          stage('Build [Docker-Image]') {
+      
+              when {
+                  anyOf {
+                      branch 'develop'
+                      branch 'feature-*'
+                      branch 'release-*'
+                      branch 'master'
+                      environment name: 'DEPLOYABLE', value: 'true'
+                  }
+              }
+      
+              steps {
+                  buildDockerImage semVer: true
+              }
+          }
+
+          stage('Deployment') {
+      
+              when {
+                  environment name: 'DEPLOYABLE', value: 'true'
+              }
+      
+              parallel {
+                  stage('ETU (develop)') {
+                      when {
+                          branch 'develop'
+                      }
+                      steps {
+                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
+                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-dev"]) {
+                                  deployToStage()
+                              }
+                          }
+                      }
+                  }
+      
+                  stage('ETU (release-*)') {
+                      when {
+                          branch 'release-*'
+                      }
+                      steps {
+                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
+                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}"]) {
+                                  deployToStage()
+                              }
+                          }
+                      }
+                  }
+      
+                  stage('ETU (feature-*)') {
+                      when {
+                          branch 'feature-*'
+                      }
+                      steps {
+                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
+                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-dev"]) {
+                                  deployToStage()
+                              }
+                          }
+                      }
+                  }
+      
+                  stage('ITU (master)') {
+                      when {
+                          branch 'master'
+                      }
+                      steps {
+                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
+                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-rc"]) {
+                                  deployToStage()
+                              }
+                          }
+                      }
+                  }
+      
+                  stage('SATU (master)') {
+                      when {
+                          branch 'master'
+                      }
+                      steps {
+                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
+                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-prod"]) {
+                                  deployToStage()
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+
+          stage('Aqua Reports') {
+      
+              environment {
+                  AQUA_PROJECT_ID = '5'
+                  AQUA_PRODUCT_ID = 'foo'
+                  AQUA_RELEASE = '2.0.0'
+                  AQUA_LEVEL = 'Release 2.0.0'
+                  AQUA_JUNIT_TEST_FOLDER_ID = '1000'
+                  AQUA_INTEGRATION_TEST_FOLDER_ID = '10001'
+              }
+      
+              steps {
+      
+                  script {
+      
+                      def sendToAqua = { file, folderId, testType ->
+      
+                          def response = sh(script: """
+                          curl -X POST \
+                          -H "X-aprojectid: ${env.AQUA_PROJECT_ID}" \
+                          -H "X-afolderid: ${folderId}" \
+                          -H "X-aprodukt: ${env.AQUA_PRODUCT_ID}" \
+                          -H "X-aausbringung: ${env.AQUA_RELEASE}" \
+                          -H "X-astufe: ${env.AQUA_LEVEL}" \
+                          -H "X-ateststufe: ${testType}" \
+                          -H "X-commit: ${env.GIT_COMMIT}" \
+                          --data-binary @${file.path} \
+                          "http://aqua.com/stream/"
+                          """, returnStdout: true)
+      
+                          if (response != 'OK') {
+                              error "Unable to report ${file.path} test in aqua ${folderId} folder!"
+                          }
+                      }
+      
+                      def reports = findFiles(glob: "**/*Test.xml")
+                      reports.each { sendToAqua(it, env.JUNIT_TEST_AQUA_FOLDER_ID, 'Komponententest') }
+      
+                      reports = findFiles(glob: "**/*IT.xml")
+                      reports.each { sendToAqua(it, env.INTEGRATION_TEST_AQUA_FOLDER_ID, 'Integrationstest') }
+                  }
+              }
+          }
+
+          stage('Promote to PROD?') {
+      
+              when {
+                  branch 'master'
+              }
+      
+              steps {
+                  script {
+                      try {
+                          timeout(time: 1, unit: 'HOURS') {
+                              input id: "promote-prod", message: 'Promote release to Prod?'
+                          }
+                      } catch (e) {
+                          currentBuild.result = 'SUCCESS'
+                          env.ABORTED = true
+                          sh "Stopping early..."
+                      }
+                  }
+              }
+          }
+
+          stage('Pull Request [PROD]') {
+      
+              when {
+                  allOf {
+                      branch 'master'
+                      expression {
+                          env.ABORTED != 'true'
+                      }
+                  }
+              }
+      
+              parallel {
+      
+                  stage('FOO') {
+                      steps {
+                          deployToStage opsRepositoryName: 'foo'
+                      }
+                  }
+                  stage('BAR') {
+                      steps {
+                          deployToStage opsRepositoryName: 'nf-bar'
+                      }
+                  }
+      
+              }
+          }
+
+    }
+
+    post {
+
+        always {
+            script {
+                if (currentBuild.result == null) {
+                    currentBuild.result = 'SUCCESS'
+                }
+            }
+        }
+
+        failure {
+            mail subject: "FAILED: Job '${env.JOB_NAME} in Branch ${env.BRANCH_NAME} [${env.BUILD_NUMBER}]'",
+                    body: "FAILED: Job '${env.JOB_NAME} in Branch ${env.BRANCH_NAME} [${env.BUILD_NUMBER}]': Check console output at ${env.BUILD_URL}",
+                    to: env.CHANGE_AUTHOR_EMAIL
+        }
+    }
+}
+```
     
 ## Technology Stack
 
