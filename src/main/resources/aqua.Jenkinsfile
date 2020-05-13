@@ -34,10 +34,10 @@
                 }
 
                 def reports = findFiles(glob: "**/*Test.xml")
-                reports.each { sendToAqua(it, env.JUNIT_TEST_AQUA_FOLDER_ID, 'Komponententest') }
+                reports.each { sendToAqua(it, env.AQUA_JUNIT_TEST_FOLDER_ID, 'Komponententest') }
 
                 reports = findFiles(glob: "**/*IT.xml")
-                reports.each { sendToAqua(it, env.INTEGRATION_TEST_AQUA_FOLDER_ID, 'Integrationstest') }
+                reports.each { sendToAqua(it, env.AQUA_INTEGRATION_TEST_FOLDER_ID, 'Integrationstest') }
             }
         }
     }

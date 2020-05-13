@@ -114,7 +114,7 @@ public class JenkinsfileGeneratorMojoTest {
     @Test
     public void existsDocker() {
 
-        assertFalse(sut.existsDocker());
+        assertFalse(sut.existsDockerfile());
     }
 
     @Test
@@ -122,7 +122,7 @@ public class JenkinsfileGeneratorMojoTest {
 
         dockerFile.mkdir();
 
-        assertTrue(sut.existsDocker());
+        assertTrue(sut.existsDockerfile());
     }
 
     @Test

@@ -62,6 +62,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "app")
     String appName;
 
+    @Parameter(property = "update")
+    boolean update;
+
     public void execute() throws MojoExecutionException, MojoFailureException {
 
         MavenProject parent = project != null ? project.getParent() : null;
@@ -71,6 +74,14 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         String artifactId = project != null ? project.getArtifactId() : null;
         String rootPath = getRootPath();
+
+        if (!update) {
+
+            getLog().info("+----------------------------------+");
+            getLog().info("Jenkinsfile already exists and will be not updated: " + artifactId);
+            getLog().info("+----------------------------------+");
+            return;
+        }
 
         getLog().info("+----------------------------------+");
         getLog().info("Generate Jenkinsfile: " + artifactId + " -> " + rootPath);
@@ -222,7 +233,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixupDeploymentProd(String template) {
 
-        if (prodStages.length == 0 || !existsDocker()) {
+        if (prodStages.length == 0 || !existsDockerfile()) {
             return null;
         }
 
@@ -260,9 +271,14 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return null;
     }
 
-    boolean existsDocker() {
+    boolean existsDockerfile() {
 
         return new File(getRootPath() + "/Dockerfile").exists();
+    }
+
+    boolean existsJenkinsfile() {
+
+        return new File(getRootPath() + "/Jenkinsfile").exists();
     }
 
     String maskEnvironmentVariable(String value) {
@@ -290,16 +306,16 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
             case "docker-build":
             case "deployment":
-                return getStageOrNull(template, existsDocker());
+                return getStageOrNull(template, existsDockerfile());
 
             case "publish":
             case "tag":
-                return getStageOrNull(template, !existsDocker());
+                return getStageOrNull(template, !existsDockerfile());
 
             case "aqua":
                 return fixupAquaStage(template);
             case "promote":
-                return getStageOrNull(template, prodStages.length > 0 && existsDocker());
+                return getStageOrNull(template, prodStages.length > 0 && existsDockerfile());
             case "deployment-prod":
                 return fixupDeploymentProd(template);
             default:
