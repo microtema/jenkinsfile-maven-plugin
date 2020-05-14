@@ -12,5 +12,5 @@ environment {
 
         BOOTSTRAP_URL = @BOOTSTRAP_URL@
         MAVEN_ARGS = '-s ./bootstrap/settings.xml'
-        CBP_KEYSTORE_LOCATION = './bootstrap/keystore'
+        CBP_KEYSTORE_LOCATION = '../bootstrap/keystore'
     }
