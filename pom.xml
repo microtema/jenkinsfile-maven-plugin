@@ -192,18 +192,4 @@
         </developer>
     </developers>
 
-    <pluginRepositories>
-        <pluginRepository>
-            <id>kundenfokus-maven-public.nexus.in.fiduciagad.de</id>
-            <url>https://nexus.in.fiduciagad.de/repository/kundenfokus-maven-public</url>
-        </pluginRepository>
-    </pluginRepositories>
-
-    <repositories>
-        <repository>
-            <id>kundenfokus-maven-public.nexus.in.fiduciagad.de</id>
-            <url>https://nexus.in.fiduciagad.de/repository/kundenfokus-maven-public/</url>
-        </repository>
-    </repositories>
-
 </project>
