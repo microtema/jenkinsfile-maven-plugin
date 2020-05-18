@@ -11,6 +11,7 @@
                     }
                 }
                 pipelineUtils = load './bootstrap/jenkins/pipeline-utils.groovy'
+                env.VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()
             }
 
             sh 'whoami'
