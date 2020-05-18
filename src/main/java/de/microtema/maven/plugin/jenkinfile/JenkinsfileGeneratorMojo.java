@@ -69,25 +69,29 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     boolean update;
 
     public void execute() throws MojoExecutionException, MojoFailureException {
-
-        MavenProject parent = project != null ? project.getParent() : null;
-        if (parent != null) {
-            project = parent;
+        if (project == null) {
+            return;
         }
 
-        String artifactId = project != null ? project.getArtifactId() : null;
+        String packaging = project.getPackaging();
         String rootPath = getRootPath();
+
+        if (!packaging.equals("pom")) {
+            getLog().info("+----------------------------------+");
+            getLog().info("Skip maven module: " + appName);
+            return;
+        }
 
         if (!update) {
 
             getLog().info("+----------------------------------+");
-            getLog().info("Jenkinsfile already exists and will be not updated: " + artifactId);
+            getLog().info("Jenkinsfile already exists and will be not updated: " + appName);
             getLog().info("+----------------------------------+");
             return;
         }
 
         getLog().info("+----------------------------------+");
-        getLog().info("Generate Jenkinsfile: " + artifactId + " -> " + rootPath);
+        getLog().info("Generate Jenkinsfile: " + appName + " -> " + rootPath);
         getLog().info("+----------------------------------+");
 
         String agent = getJenkinsStage("agent");
@@ -111,10 +115,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     }
 
     String getRootPath() {
-
-        if (project == null) {
-            return ".";
-        }
 
         return project.getBasedir().getPath();
     }
@@ -278,11 +278,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     boolean existsDockerfile() {
 
         return new File(getRootPath() + "/Dockerfile").exists();
-    }
-
-    boolean existsJenkinsfile() {
-
-        return new File(getRootPath() + "/Jenkinsfile").exists();
     }
 
     String maskEnvironmentVariable(String value) {
