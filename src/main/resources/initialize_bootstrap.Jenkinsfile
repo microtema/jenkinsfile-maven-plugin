@@ -1,14 +1,14 @@
 script {
-                dir('bootstrap') {
-                    try {
-                        def remoteUrl = sh(script: 'git remote -v', returnStdout:true).trim()
-                        if (remoteUrl.contains(env.BOOTSTRAP_URL)) {
-                            env.MAVEN_ARGS = '-s ./settings.xml'
-                        } else {
+                if (env.BOOTSTRAP_URL.toLowerCase() == env.GIT_URL.toLowerCase()) {
+                    env.MAVEN_ARGS = '-s ./settings.xml'
+                } else {
+                    dir('bootstrap') {
+                        try {
                             git branch: env.BRANCH_NAME, url: env.BOOTSTRAP_URL, credentialsId: 'SCM_CREDENTIALS'
+                        } catch (e) {
+                            git branch: 'develop', url: env.BOOTSTRAP_URL, credentialsId: 'SCM_CREDENTIALS'
                         }
-                    } catch (e) {
-                        git branch: 'develop', url: env.BOOTSTRAP_URL, credentialsId: 'SCM_CREDENTIALS'
+                        env.MAVEN_ARGS = '-s ./bootstrap/settings.xml'
                     }
                 }
            }

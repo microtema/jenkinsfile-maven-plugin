@@ -255,10 +255,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             environments.putIfAbsent("DEPLOYABLE", "sh(script: 'oc whoami', returnStdout: true).trim().startsWith(\"system:serviceaccount:${env.BASE_NAMESPACE}\")");
         }
 
-        if (StringUtils.isNotEmpty(bootstrapUrl)) {
-            environments.putIfAbsent("MAVEN_ARGS", maskEnvironmentVariable("-s ./bootstrap/settings.xml"));
-        }
-
         for (Map.Entry<String, String> entry : environments.entrySet()) {
             String line = entry.getKey() + " = " + entry.getValue();
             environmentsAsString.append(paddLine(line, 8));
@@ -365,7 +361,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 return fixSonarStage(template);
             case "test":
             case "unit-test":
-                return getStageOrNull(template, !project.getPackaging().equals("pom"));
+                return getStageOrNull(template, StringUtils.isNotEmpty(aquaJunitFolderId) || StringUtils.isNotEmpty(aquaITFolderId));
 
             case "docker-build":
             case "deployment":
