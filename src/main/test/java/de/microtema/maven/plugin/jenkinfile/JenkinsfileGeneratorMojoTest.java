@@ -27,7 +27,7 @@ public class JenkinsfileGeneratorMojoTest {
         sut = new JenkinsfileGeneratorMojo();
 
         dockerFile.delete();
-        jenkinsfile.delete();
+        //jenkinsfile.delete();
     }
 
     @Test
@@ -35,6 +35,7 @@ public class JenkinsfileGeneratorMojoTest {
 
         dockerFile.mkdir();
 
+        sut.update = true;
         sut.prodStages = new String[]{"foo", "nf-bar"};
 
         sut.execute();
@@ -58,34 +59,6 @@ public class JenkinsfileGeneratorMojoTest {
         String stage = sut.getTestStageName();
 
         assertEquals("unit-test", stage);
-    }
-
-    @Test
-    public void fixSonarStage() {
-
-        String stage = sut.fixSonarStage("mvn sonar:sonar -Dsonar.branch.name=$BRANCH_NAME $MAVEN_ARGS");
-
-        assertEquals("mvn sonar:sonar -Dsonar.branch.name=$BRANCH_NAME $MAVEN_ARGS", stage);
-    }
-
-    @Test
-    public void fixSonarStageWithExclusions() {
-
-        sut.sonarExcludes = new String[]{"foo-bar"};
-
-        String stage = sut.fixSonarStage("mvn sonar:sonar -Dsonar.branch.name=$BRANCH_NAME $MAVEN_ARGS");
-
-        assertEquals("mvn sonar:sonar -pl !foo-bar -Dsonar.branch.name=$BRANCH_NAME $MAVEN_ARGS", stage);
-    }
-
-    @Test
-    public void fixupEnvironment() {
-
-        sut.baseNamespace = "app";
-
-        String stage = sut.fixupEnvironment("BASE_NAMESPACE = @BASE_NAMESPACE@");
-
-        assertEquals("BASE_NAMESPACE = 'app'", stage);
     }
 
     @Test

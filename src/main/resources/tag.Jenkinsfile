@@ -1,5 +1,9 @@
     stage('Tag [Release]') {
 
+        environment{
+            VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()
+        }
+
         when {
             branch 'master'
         }
@@ -17,7 +21,6 @@
                         }
 
                         sh 'echo there is already a tag for this version $VERSION'
-                        sh "echo ${e.toString()}"
                     }
                 }
             }

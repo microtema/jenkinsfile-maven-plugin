@@ -10,7 +10,6 @@
                     }
 
                     sh 'echo there is already a publication for this version $VERSION'
-                    sh "echo ${e.toString()}"
                 }
             }
         }

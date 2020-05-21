@@ -13,7 +13,7 @@
                 } catch (e) {
                     currentBuild.result = 'SUCCESS'
                     env.ABORTED = true
-                    sh "Stopping early..."
+                    sh 'echo Stopping early...'
                 }
             }
         }

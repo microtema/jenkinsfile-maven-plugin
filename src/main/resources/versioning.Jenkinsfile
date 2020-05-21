@@ -1,5 +1,9 @@
     stage('Versioning') {
 
+        environment {
+            VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()
+        }
+
         when {
             anyOf {
                 branch 'release-*'

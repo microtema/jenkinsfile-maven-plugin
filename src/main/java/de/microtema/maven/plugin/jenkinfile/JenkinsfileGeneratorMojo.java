@@ -3,8 +3,6 @@ package de.microtema.maven.plugin.jenkinfile;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.plugin.AbstractMojo;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -18,7 +16,9 @@ import java.io.PrintWriter;
 import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Mojo(name = "generate", defaultPhase = LifecyclePhase.COMPILE)
 public class JenkinsfileGeneratorMojo extends AbstractMojo {
@@ -65,20 +65,25 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "app")
     String appName;
 
+    @Parameter(property = "environments")
+    LinkedHashMap<String, String> environments = new LinkedHashMap<>();
+
+    @Parameter(property = "stages")
+    LinkedHashMap<String, String> stages = new LinkedHashMap<>();
+
     @Parameter(property = "update")
     boolean update;
 
-    public void execute() throws MojoExecutionException, MojoFailureException {
-        if (project == null) {
-            return;
-        }
+    public void execute() {
 
-        String packaging = project.getPackaging();
         String rootPath = getRootPath();
 
-        if (!packaging.equals("pom")) {
+        // Skip maven sub modules
+        if (!new File(rootPath + "/.git").exists()) {
+
             getLog().info("+----------------------------------+");
-            getLog().info("Skip maven module: " + appName);
+            getLog().info("Skip maven module: " + appName + " since it is not a git repo!");
+
             return;
         }
 
@@ -87,11 +92,12 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             getLog().info("+----------------------------------+");
             getLog().info("Jenkinsfile already exists and will be not updated: " + appName);
             getLog().info("+----------------------------------+");
+
             return;
         }
 
         getLog().info("+----------------------------------+");
-        getLog().info("Generate Jenkinsfile: " + appName + " -> " + rootPath);
+        getLog().info("Generate Jenkinsfile for " + appName + " -> " + rootPath);
         getLog().info("+----------------------------------+");
 
         String agent = getJenkinsStage("agent");
@@ -115,6 +121,10 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     }
 
     String getRootPath() {
+
+        if (project == null) {
+            return ".";
+        }
 
         return project.getBasedir().getPath();
     }
@@ -203,6 +213,25 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixSonarStage(String template) {
 
+        if (project.getPackaging().equals("pom")) {
+            return null;
+        }
+
+        long count = 0;
+
+        if (project != null) {
+            count = project.getProperties().entrySet()
+                    .stream()
+                    .filter(it -> String.valueOf(it.getKey()).startsWith("sonar.")).count();
+        }
+
+        if (count == 0) {
+
+            getLog().info("Skip Stage(Sonar) in Jenkinsfile, since there is no sonar properties configured: " + appName);
+
+            return null;
+        }
+
         if (sonarExcludes.length == 0) {
             return template;
         }
@@ -218,12 +247,42 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixupEnvironment(String template) {
 
-        return template.replaceFirst("@BASE_NAMESPACE@", maskEnvironmentVariable(baseNamespace))
-                .replaceFirst("@APP@", maskEnvironmentVariable(appName))
-                .replaceFirst("@BOOTSTRAP_URL@", maskEnvironmentVariable(bootstrapUrl));
+        StringBuilder environmentsAsString = new StringBuilder();
+
+        if (existsDockerfile()) {
+            environments.putIfAbsent("APP", maskEnvironmentVariable(appName));
+            environments.putIfAbsent("BASE_NAMESPACE", maskEnvironmentVariable(baseNamespace));
+            environments.putIfAbsent("DEPLOYABLE", "sh(script: 'oc whoami', returnStdout: true).trim().startsWith(\"system:serviceaccount:${env.BASE_NAMESPACE}\")");
+        }
+
+        if (StringUtils.isNotEmpty(bootstrapUrl)) {
+            environments.putIfAbsent("MAVEN_ARGS", maskEnvironmentVariable("-s ./bootstrap/settings.xml"));
+        }
+
+        for (Map.Entry<String, String> entry : environments.entrySet()) {
+            String line = entry.getKey() + " = " + entry.getValue();
+            environmentsAsString.append(paddLine(line, 8));
+        }
+
+        return template.replace("@ENVIRONMENTS@", environmentsAsString.toString());
+    }
+
+    String fixupInitializeStage(String template) {
+
+        String bootstrap = StringUtils.EMPTY;
+
+        if (StringUtils.isNotEmpty(bootstrapUrl)) {
+            bootstrap = getJenkinsStage("initialize_bootstrap");
+        }
+
+        return template.replace("@BOOTSTRAP_URL@", maskEnvironmentVariable(bootstrapUrl)).replace("@BOOTSTRAP@", bootstrap);
     }
 
     String fixupAquaStage(String template) {
+
+        if (project.getPackaging().equals("pom")) {
+            return null;
+        }
 
         return template.replaceFirst("@AQUA_PROJECT_ID@", maskEnvironmentVariable(aquaProjectId))
                 .replaceFirst("@AQUA_URL@", maskEnvironmentVariable(aquaUrl))
@@ -300,8 +359,13 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         switch (templateName) {
             case "environment":
                 return fixupEnvironment(template);
+            case "initialize":
+                return fixupInitializeStage(template);
             case "sonar":
                 return fixSonarStage(template);
+            case "test":
+            case "unit-test":
+                return getStageOrNull(template, !project.getPackaging().equals("pom"));
 
             case "docker-build":
             case "deployment":
