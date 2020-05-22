@@ -100,6 +100,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         getLog().info("Generate Jenkinsfile for " + appName + " -> " + rootPath);
         getLog().info("+----------------------------------+");
 
+        initDefaults();
+
         String agent = getJenkinsStage("agent");
         String environment = getJenkinsStage("environment");
         String options = getJenkinsStage("options");
@@ -120,6 +122,14 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         }
     }
 
+    private void initDefaults() {
+        if (stages.isEmpty()) {
+            stages.put("etu", "develop");
+            stages.put("itu", "release-*");
+            stages.put("satu", "master");
+        }
+    }
+
     String getRootPath() {
 
         if (project == null) {
@@ -134,7 +144,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         String test = getTestStageName();
 
         List<String> stages = Arrays.asList("initialize", "versioning", "compile", test, "maven-build",
-                "sonar", "security", "docker-build", "tag", "publish", "deployment", "aqua",
+                "sonar", "security", "docker-build", "tag", "publish", "deployment", "readiness", "aqua",
                 "promote", "deployment-prod");
 
         StringBuilder body = new StringBuilder();
@@ -274,6 +284,27 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return template.replace("@BOOTSTRAP_URL@", maskEnvironmentVariable(bootstrapUrl)).replace("@BOOTSTRAP@", bootstrap);
     }
 
+    String fixupReadinessStage(String template) {
+
+        if (!existsDockerfile()) {
+            return null;
+        }
+
+        StringBuilder body = new StringBuilder();
+
+        for (Map.Entry<String, String> stage : stages.entrySet()) {
+            body.append("\n");
+            String scriptTemplate = getJenkinsStage("readiness-step");
+            String stageTemplate = getJenkinsStage("readiness-stage")
+                    .replace("@STAGE_NAME@", maskEnvironmentVariable(stage.getKey().toUpperCase()))
+                    .replace("@BRANCH_PATTERN@", maskEnvironmentVariable(stage.getValue()))
+                    .replace("@STEP@", scriptTemplate);
+            body.append(paddLine(stageTemplate, 6));
+        }
+
+        return template.replace("@STAGES@", body.toString());
+    }
+
     String fixupAquaStage(String template) {
 
         if (project.getPackaging().equals("pom")) {
@@ -371,6 +402,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             case "tag":
                 return getStageOrNull(template, !existsDockerfile());
 
+            case "readiness":
+                return fixupReadinessStage(template);
             case "aqua":
                 return fixupAquaStage(template);
             case "promote":
