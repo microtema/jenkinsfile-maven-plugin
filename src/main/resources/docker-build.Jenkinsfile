@@ -23,7 +23,7 @@
                 }
             }
 
-            stage('RC') {
+            stage('Pre-Release') {
                 when {
                     branch 'release-*'
                 }
@@ -32,7 +32,7 @@
                 }
             }
 
-            stage('Master') {
+            stage('Release') {
                 when {
                     branch 'master'
                 }

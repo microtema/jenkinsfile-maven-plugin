@@ -143,7 +143,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         String test = getTestStageName();
 
-        List<String> stages = Arrays.asList("initialize", "versioning", "compile", test, "maven-build",
+        List<String> stages = Arrays.asList("initialize", "versioning", "compile", "db-migration", test, "maven-build",
                 "sonar", "security", "docker-build", "tag", "publish", "deployment", "readiness", "aqua",
                 "promote", "deployment-prod");
 
@@ -260,13 +260,19 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         StringBuilder environmentsAsString = new StringBuilder();
 
         if (existsDockerfile()) {
-            environments.putIfAbsent("APP", maskEnvironmentVariable(appName));
-            environments.putIfAbsent("BASE_NAMESPACE", maskEnvironmentVariable(baseNamespace));
+            environments.putIfAbsent("APP", appName);
+            environments.putIfAbsent("BASE_NAMESPACE", baseNamespace);
             environments.putIfAbsent("DEPLOYABLE", "sh(script: 'oc whoami', returnStdout: true).trim().startsWith(\"system:serviceaccount:${env.BASE_NAMESPACE}\")");
         }
 
         for (Map.Entry<String, String> entry : environments.entrySet()) {
-            String line = entry.getKey() + " = " + entry.getValue();
+            String value = entry.getValue();
+
+            if (!(value.startsWith("sh") || value.startsWith("'") || value.startsWith("\""))) {
+                value = maskEnvironmentVariable(value);
+            }
+
+            String line = entry.getKey() + " = " + value;
             environmentsAsString.append(paddLine(line, 8));
         }
 
@@ -278,7 +284,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         String bootstrap = StringUtils.EMPTY;
 
         if (StringUtils.isNotEmpty(bootstrapUrl)) {
-            bootstrap = getJenkinsStage("initialize_bootstrap");
+            bootstrap = getJenkinsStage("initialize-bootstrap");
         }
 
         return template.replace("@BOOTSTRAP_URL@", maskEnvironmentVariable(bootstrapUrl)).replace("@BOOTSTRAP@", bootstrap);
@@ -294,11 +300,33 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         for (Map.Entry<String, String> stage : stages.entrySet()) {
             body.append("\n");
-            String scriptTemplate = getJenkinsStage("readiness-step");
+            String scriptTemplate = getJenkinsStage("readiness-steps");
             String stageTemplate = getJenkinsStage("readiness-stage")
                     .replace("@STAGE_NAME@", maskEnvironmentVariable(stage.getKey().toUpperCase()))
                     .replace("@BRANCH_PATTERN@", maskEnvironmentVariable(stage.getValue()))
-                    .replace("@STEP@", scriptTemplate);
+                    .replace("@STEPS@", scriptTemplate);
+            body.append(paddLine(stageTemplate, 6));
+        }
+
+        return template.replace("@STAGES@", body.toString());
+    }
+
+    String fixupDbMigrationStage(String template) {
+
+        if (!existsDockerfile() && !existsDbMigrationScripts()) {
+            return null;
+        }
+
+        StringBuilder body = new StringBuilder();
+
+        for (Map.Entry<String, String> stage : stages.entrySet()) {
+            body.append("\n");
+            String scriptTemplate = getJenkinsStage("db-migration-steps")
+                    .replace("@STAGE_NAME@", stage.getKey().toLowerCase());
+            String stageTemplate = getJenkinsStage("db-migration-stage")
+                    .replace("@STAGE_NAME@", maskEnvironmentVariable(stage.getKey().toUpperCase()))
+                    .replace("@BRANCH_PATTERN@", maskEnvironmentVariable(stage.getValue()))
+                    .replace("@STEPS@", scriptTemplate);
             body.append(paddLine(stageTemplate, 6));
         }
 
@@ -366,6 +394,11 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return new File(getRootPath() + "/Dockerfile").exists();
     }
 
+    boolean existsDbMigrationScripts() {
+
+        return new File(getRootPath() + "/src/main/resources/db/migration").exists();
+    }
+
     String maskEnvironmentVariable(String value) {
 
         return "'" + (value != null ? value : "") + "'";
@@ -402,6 +435,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             case "tag":
                 return getStageOrNull(template, !existsDockerfile());
 
+            case "db-migration":
+                return fixupDbMigrationStage(template);
             case "readiness":
                 return fixupReadinessStage(template);
             case "aqua":
