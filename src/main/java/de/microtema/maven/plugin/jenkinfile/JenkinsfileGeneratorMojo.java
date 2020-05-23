@@ -221,7 +221,21 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return template.replace("@UPSTREAM_PROJECTS@", upstreamProjectsParam.toString());
     }
 
+    boolean hasSourceCode() {
+
+        if (new File(getRootPath() + "/src/main/test").exists()) {
+            return true;
+        }
+
+        return project.getModules().stream().noneMatch(it -> ((String) it).startsWith("../"));
+    }
+
     String fixSonarStage(String template) {
+
+        if (!hasSourceCode()) {
+
+            return null;
+        }
 
         long count = 0;
 
@@ -331,6 +345,10 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixupAquaStage(String template) {
 
+        if (!hasSourceCode()) {
+            return null;
+        }
+
         return template.replaceFirst("@AQUA_PROJECT_ID@", maskEnvironmentVariable(aquaProjectId))
                 .replaceFirst("@AQUA_URL@", maskEnvironmentVariable(aquaUrl))
                 .replaceFirst("@AQUA_PRODUCT_ID@", maskEnvironmentVariable(aquaProductId))
@@ -417,7 +435,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 return fixSonarStage(template);
             case "test":
             case "unit-test":
-                return getStageOrNull(template, StringUtils.isNotEmpty(aquaJunitFolderId) || StringUtils.isNotEmpty(aquaITFolderId));
+                return getStageOrNull(template, hasSourceCode());
 
             case "docker-build":
             case "deployment":

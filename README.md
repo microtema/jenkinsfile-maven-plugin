@@ -3,6 +3,16 @@ Reducing Boilerplate Code with jenkinnsfile maven plugin
 > More Time for Feature and functionality
   Through a simple set of jenkinsfile templates and saving 60% of development time 
 
+## Key Features
+* Auto generate by maven compile phase
+* Auto JUnit Tests detector by adding "JUnit Tests" stage
+* Auto Integration Tests detector by adding "Integration Tests" stage
+* Auto Dockerfile detector by adding "Build Docker" stage
+* Auto Maven artifact detector by adding "Deploy Maven Artifact" stage
+* Auto Sonar report detector by adding "Sonar Report" stage
+* Auto Deployment to Cloud Platform by adding "Deployment" stage
+
+
 ## How to use
 
 ```
@@ -15,7 +25,7 @@ Reducing Boilerplate Code with jenkinnsfile maven plugin
     <plugin>
         <groupId>de.microtema</groupId>
         <artifactId>jenkinsfile-maven-plugin</artifactId>
-        <version>2.0.0</version>
+        <version>2.0.3</version>
         <configuration>
             <appName>${jenkinsfile.app-name}</appName>
             ...
