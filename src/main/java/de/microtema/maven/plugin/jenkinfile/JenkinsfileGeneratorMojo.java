@@ -223,10 +223,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixSonarStage(String template) {
 
-        if (project.getPackaging().equals("pom")) {
-            return null;
-        }
-
         long count = 0;
 
         if (project != null) {
@@ -313,7 +309,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixupDbMigrationStage(String template) {
 
-        if (!existsDockerfile() && !existsDbMigrationScripts()) {
+        if (!existsDockerfile() || !existsDbMigrationScripts()) {
             return null;
         }
 
@@ -334,10 +330,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     }
 
     String fixupAquaStage(String template) {
-
-        if (project.getPackaging().equals("pom")) {
-            return null;
-        }
 
         return template.replaceFirst("@AQUA_PROJECT_ID@", maskEnvironmentVariable(aquaProjectId))
                 .replaceFirst("@AQUA_URL@", maskEnvironmentVariable(aquaUrl))
@@ -431,6 +423,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             case "deployment":
                 return getStageOrNull(template, existsDockerfile());
 
+            case "versioning":
             case "publish":
             case "tag":
                 return getStageOrNull(template, !existsDockerfile());
