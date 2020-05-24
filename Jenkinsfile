@@ -7,11 +7,8 @@ pipeline {
     environment {
 
         CURRENT_TIME = sh(script: 'date +%Y-%m-%d-%H-%M', returnStdout: true).trim()
-        CHANGE_AUTHOR_EMAIL = sh(script: 'git --no-pager show -s --format=\'%ae\'', returnStdout: true).trim()
+        CHANGE_AUTHOR_EMAIL = sh(script: "git --no-pager show -s --format='%ae'", returnStdout: true).trim()
 
-        APP = ''
-        BASE_NAMESPACE = ''
-        DEPLOYABLE = sh(script: 'oc whoami', returnStdout: true).trim().startsWith("system:serviceaccount:${env.BASE_NAMESPACE}")
 
     }
 
@@ -29,6 +26,10 @@ pipeline {
         
           stage('Initialize') {
       
+              environment {
+                  BOOTSTRAP_URL = ''
+              }
+      
               steps {
                   
                   sh 'whoami'
@@ -41,7 +42,7 @@ pipeline {
 
           stage('Versioning') {
       
-              environment{
+              environment {
                   VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()
               }
       
@@ -60,21 +61,7 @@ pipeline {
 
           stage('Compile') {
               steps {
-                  script {
-                      sh 'mvn compile -U $MAVEN_ARGS'
-                  }
-              }
-          }
-
-          stage('Test') {
-              steps {
-                  sh 'mvn test $MAVEN_ARGS'
-              }
-      
-              post {
-                  always {
-                      junit '**/*Test.xml'
-                  }
+                  sh 'mvn compile -U $MAVEN_ARGS'
               }
           }
 
@@ -90,172 +77,11 @@ pipeline {
               }
           }
 
-          stage('Build [Docker-Image]') {
+          stage('Tag [Release]') {
       
-              when {
-                  environment name: 'DEPLOYABLE', value: 'true'
+              environment{
+                  VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()
               }
-      
-              parallel {
-                  stage('Feature') {
-                      when {
-                          branch 'feature-*'
-                      }
-                      steps {
-                          buildDockerImage semVer: true
-                      }
-                  }
-      
-                  stage('Develop') {
-                      when {
-                          branch 'develop'
-                      }
-                      steps {
-                          buildDockerImage semVer: true
-                      }
-                  }
-      
-                  stage('RC') {
-                      when {
-                          branch 'release-*'
-                      }
-                      steps {
-                          buildDockerImage semVer: true
-                      }
-                  }
-      
-                  stage('Master') {
-                      when {
-                          branch 'master'
-                      }
-                      steps {
-                          buildDockerImage semVer: true
-                      }
-                  }
-              }
-          }
-      
-
-          stage('Deployment') {
-      
-              when {
-                  environment name: 'DEPLOYABLE', value: 'true'
-              }
-      
-              parallel {
-                  stage('ETU (feature-*)') {
-                      when {
-                          branch 'feature-*'
-                      }
-                      steps {
-                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
-                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-etu"]) {
-                                  createBranchIfNotExistsAndCommitChanges()
-                              }
-                          }
-                      }
-                  }
-      
-                  stage('ETU (develop)') {
-                      when {
-                          branch 'develop'
-                      }
-                      steps {
-                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
-                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-etu"]) {
-                                  createAndMergeOpsRepoMergeRequest()
-                              }
-                          }
-                      }
-                  }
-      
-                  stage('ETU (release-*)') {
-                      when {
-                          branch 'release-*'
-                      }
-                      steps {
-                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
-                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}"]) {
-                                  createBranchIfNotExistsAndCommitChanges()
-                              }
-                          }
-                      }
-                  }
-      
-                  stage('ITU (master)') {
-                      when {
-                          branch 'master'
-                      }
-                      steps {
-                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
-                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-itu"]) {
-                                  createAndMergeOpsRepoMergeRequest()
-                              }
-                          }
-                      }
-                  }
-      
-                  stage('SATU (master)') {
-                      when {
-                          branch 'master'
-                      }
-                      steps {
-                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
-                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-satu"]) {
-                                  createAndMergeOpsRepoMergeRequest()
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-
-          stage('Aqua Reports') {
-      
-              environment {
-                  AQUA_URL = ''
-                  AQUA_PROJECT_ID = ''
-                  AQUA_PRODUCT_ID = ''
-                  AQUA_RELEASE = ''
-                  AQUA_LEVEL = ''
-                  AQUA_JUNIT_TEST_FOLDER_ID = ''
-                  AQUA_INTEGRATION_TEST_FOLDER_ID = ''
-              }
-      
-              steps {
-      
-                  script {
-      
-                      def sendToAqua = { file, folderId, testType ->
-      
-                          def response = sh(script: """
-                          curl -X POST \
-                          -H "X-aprojectid: ${env.AQUA_PROJECT_ID}" \
-                          -H "X-afolderid: ${folderId}" \
-                          -H "X-aprodukt: ${env.AQUA_PRODUCT_ID}" \
-                          -H "X-aausbringung: ${env.AQUA_RELEASE}" \
-                          -H "X-astufe: ${env.AQUA_LEVEL}" \
-                          -H "X-ateststufe: ${testType}" \
-                          -H "X-commit: ${env.GIT_COMMIT}" \
-                          --data-binary @${file.path} \
-                          "${env.AQUA_URL}"
-                          """, returnStdout: true)
-      
-                          if (response != 'OK') {
-                              error "Unable to report ${file.path} test in aqua ${folderId} folder!"
-                          }
-                      }
-      
-                      def reports = findFiles(glob: "**/*Test.xml")
-                      reports.each { sendToAqua(it, env.AQUA_JUNIT_TEST_FOLDER_ID, 'Komponententest') }
-      
-                      reports = findFiles(glob: "**/*IT.xml")
-                      reports.each { sendToAqua(it, env.AQUA_INTEGRATION_TEST_FOLDER_ID, 'Integrationstest') }
-                  }
-              }
-          }
-
-          stage('Promote to PROD?') {
       
               when {
                   branch 'master'
@@ -263,43 +89,37 @@ pipeline {
       
               steps {
                   script {
-                      try {
-                          timeout(time: 1, unit: 'HOURS') {
-                              input id: "promote-prod", message: 'Promote release to Prod?'
+                      withGit {
+                          try {
+                              sh 'git tag $VERSION $GIT_COMMIT'
+                              sh 'git push origin $VERSION'
+                          } catch (e) {
+      
+                              if (env.BRANCH_NAME != 'master') {
+                                  throw e
+                              }
+      
+                              sh 'echo there is already a tag for this version $VERSION'
                           }
-                      } catch (e) {
-                          currentBuild.result = 'SUCCESS'
-                          env.ABORTED = true
-                          sh "Stopping early..."
                       }
                   }
               }
           }
 
-          stage('Pull Request [PROD]') {
+          stage('Publish [Maven-Artifact]') {
+              steps {
+                  script {
+                      try {
+                           sh 'mvn deploy -Dmaven.test.skip=true -DskipTests=true $MAVEN_ARGS'
+                      } catch (e) {
       
-              when {
-                  allOf {
-                      branch 'master'
-                      expression {
-                          env.ABORTED != 'true'
+                          if (env.BRANCH_NAME != 'master') {
+                              throw e
+                          }
+      
+                          sh 'echo there is already a publication for this version $VERSION'
                       }
                   }
-              }
-      
-              parallel {
-      
-                  stage('FOO') {
-                      steps {
-                          createOpsRepoMergeRequest opsRepositoryName: 'foo'
-                      }
-                  }
-                  stage('BAR') {
-                      steps {
-                          createOpsRepoMergeRequest opsRepositoryName: 'nf-bar'
-                      }
-                  }
-      
               }
           }
 
@@ -318,7 +138,7 @@ pipeline {
         failure {
             mail subject: "FAILED: Job '${env.JOB_NAME} in Branch ${env.BRANCH_NAME} [${env.BUILD_NUMBER}]'",
                     body: "FAILED: Job '${env.JOB_NAME} in Branch ${env.BRANCH_NAME} [${env.BUILD_NUMBER}]': Check console output at ${env.BUILD_URL}",
-                    to: env.CHANGE_AUTHOR_EMAIL
+                      to:  sh(script: "git --no-pager show -s --format='%ae'", returnStdout: true).trim()
         }
     }
 }

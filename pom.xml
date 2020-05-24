@@ -14,7 +14,6 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <junit.version>4.12</junit.version>
         <maven.compiler.source.version>1.8</maven.compiler.source.version>
         <maven.compiler.target.version>1.8</maven.compiler.target.version>
         <maven.source.plugin>2.2.1</maven.source.plugin>
@@ -30,6 +29,9 @@
         <commons.io.version>2.4</commons.io.version>
         <commons.utils.version>${project.version}</commons.utils.version>
         <powermock.version>1.7.1</powermock.version>
+        <!-- Test -->
+        <junit.jupiter.version>5.5.2</junit.jupiter.version>
+        <mockito.junit.jupiter.version>2.23.4</mockito.junit.jupiter.version>
     </properties>
 
     <dependencies>
@@ -60,9 +62,26 @@
             <version>${commons.lang3.version}</version>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>${junit.version}</version>
+            <groupId>javax.inject</groupId>
+            <artifactId>javax.inject</artifactId>
+            <version>1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.jupiter.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito.junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-compat</artifactId>
+            <version>3.0.3</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

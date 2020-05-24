@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,9 +32,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     @Parameter(property = "prod-stages")
     String[] prodStages = new String[0];
-
-    @Parameter(property = "sonar-excludes")
-    String[] sonarExcludes = new String[0];
 
     @Parameter(property = "base-namespace")
     String baseNamespace;
@@ -74,12 +72,12 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "update")
     boolean update;
 
+    JenkinsfileGeneratorService service = new JenkinsfileGeneratorService();
+
     public void execute() {
 
-        String rootPath = getRootPath();
-
         // Skip maven sub modules
-        if (!new File(rootPath + "/.git").exists()) {
+        if (!service.isGitRepo(project)) {
 
             getLog().info("+----------------------------------+");
             getLog().info("Skip maven module: " + appName + " since it is not a git repo!");
@@ -95,6 +93,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
             return;
         }
+
+        String rootPath = service.getRootPath(project);
 
         getLog().info("+----------------------------------+");
         getLog().info("Generate Jenkinsfile for " + appName + " -> " + rootPath);
@@ -122,21 +122,13 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         }
     }
 
-    private void initDefaults() {
+
+    void initDefaults() {
         if (stages.isEmpty()) {
             stages.put("etu", "develop");
             stages.put("itu", "release-*");
             stages.put("satu", "master");
         }
-    }
-
-    String getRootPath() {
-
-        if (project == null) {
-            return ".";
-        }
-
-        return project.getBasedir().getPath();
     }
 
     String buildStages() {
@@ -221,18 +213,10 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return template.replace("@UPSTREAM_PROJECTS@", upstreamProjectsParam.toString());
     }
 
-    boolean hasSourceCode() {
-
-        if (new File(getRootPath() + "/src/main/test").exists()) {
-            return true;
-        }
-
-        return project.getModules().stream().noneMatch(it -> ((String) it).startsWith("../"));
-    }
 
     String fixSonarStage(String template) {
 
-        if (!hasSourceCode()) {
+        if (!service.hasSourceCode(project)) {
 
             return null;
         }
@@ -252,24 +236,43 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             return null;
         }
 
-        if (sonarExcludes.length == 0) {
+        List<String> sonarExcludes = getSonarExcludes();
+
+        if (sonarExcludes.isEmpty()) {
             return template;
         }
 
         StringBuilder excludes = new StringBuilder(" -pl ");
 
-        for (String exclude : sonarExcludes) {
+        for (int index = 0; index < sonarExcludes.size(); index++) {
+
+            String exclude = sonarExcludes.get(index);
+
             excludes.append("!").append(exclude);
+
+            if (index < sonarExcludes.size() - 1) {
+                excludes.append(" ");
+            }
         }
 
         return template.replaceFirst("sonar:sonar", "sonar:sonar" + excludes);
+    }
+
+    List<String> getSonarExcludes() {
+
+        List<String> excludes = new ArrayList<>(project.getModules());
+
+        excludes.removeIf(it -> it.startsWith("../"));
+        excludes.removeIf(it -> new File(new File(service.getRootPath(project), it), "src/main/java").exists());
+
+        return excludes;
     }
 
     String fixupEnvironment(String template) {
 
         StringBuilder environmentsAsString = new StringBuilder();
 
-        if (existsDockerfile()) {
+        if (service.existsDockerfile(project)) {
             environments.putIfAbsent("APP", appName);
             environments.putIfAbsent("BASE_NAMESPACE", baseNamespace);
             environments.putIfAbsent("DEPLOYABLE", "sh(script: 'oc whoami', returnStdout: true).trim().startsWith(\"system:serviceaccount:${env.BASE_NAMESPACE}\")");
@@ -302,7 +305,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixupReadinessStage(String template) {
 
-        if (!existsDockerfile()) {
+        if (!service.existsDockerfile(project)) {
             return null;
         }
 
@@ -323,7 +326,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixupDbMigrationStage(String template) {
 
-        if (!existsDockerfile() || !existsDbMigrationScripts()) {
+        if (!service.existsDbMigrationScripts(project)) {
             return null;
         }
 
@@ -345,7 +348,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixupAquaStage(String template) {
 
-        if (!hasSourceCode()) {
+        if (!service.hasSourceCode(project)) {
             return null;
         }
 
@@ -361,7 +364,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixupDeploymentProd(String template) {
 
-        if (prodStages.length == 0 || !existsDockerfile()) {
+        if (prodStages.length == 0 || !service.existsDockerfile(project)) {
             return null;
         }
 
@@ -399,15 +402,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return null;
     }
 
-    boolean existsDockerfile() {
-
-        return new File(getRootPath() + "/Dockerfile").exists();
-    }
-
-    boolean existsDbMigrationScripts() {
-
-        return new File(getRootPath() + "/src/main/resources/db/migration").exists();
-    }
 
     String maskEnvironmentVariable(String value) {
 
@@ -435,16 +429,16 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 return fixSonarStage(template);
             case "test":
             case "unit-test":
-                return getStageOrNull(template, hasSourceCode());
+                return getStageOrNull(template, service.hasSourceCode(project));
 
             case "docker-build":
             case "deployment":
-                return getStageOrNull(template, existsDockerfile());
+                return getStageOrNull(template, service.existsDockerfile(project));
 
             case "versioning":
             case "publish":
             case "tag":
-                return getStageOrNull(template, !existsDockerfile());
+                return getStageOrNull(template, !service.existsDockerfile(project));
 
             case "db-migration":
                 return fixupDbMigrationStage(template);
@@ -453,7 +447,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             case "aqua":
                 return fixupAquaStage(template);
             case "promote":
-                return getStageOrNull(template, prodStages.length > 0 && existsDockerfile());
+                return getStageOrNull(template, prodStages.length > 0 && service.existsDockerfile(project));
             case "deployment-prod":
                 return fixupDeploymentProd(template);
             default:
