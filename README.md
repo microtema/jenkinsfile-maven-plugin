@@ -377,6 +377,9 @@ pipeline {
     * Sonar
     * Jacoco
     
+## Test Coverage threshold
+> 95%
+    
 ## License
 
 MIT (unless noted otherwise)

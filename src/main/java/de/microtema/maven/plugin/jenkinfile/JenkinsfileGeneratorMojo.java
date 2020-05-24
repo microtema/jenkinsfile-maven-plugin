@@ -9,13 +9,11 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -221,22 +219,14 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             return null;
         }
 
-        long count = 0;
-
-        if (project != null) {
-            count = project.getProperties().entrySet()
-                    .stream()
-                    .filter(it -> String.valueOf(it.getKey()).startsWith("sonar.")).count();
-        }
-
-        if (count == 0) {
+        if (!service.hasSonarProperties(project)) {
 
             getLog().info("Skip Stage(Sonar) in Jenkinsfile, since there is no sonar properties configured: " + appName);
 
             return null;
         }
 
-        List<String> sonarExcludes = getSonarExcludes();
+        List<String> sonarExcludes = service.getSonarExcludes(project);
 
         if (sonarExcludes.isEmpty()) {
             return template;
@@ -256,16 +246,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         }
 
         return template.replaceFirst("sonar:sonar", "sonar:sonar" + excludes);
-    }
-
-    List<String> getSonarExcludes() {
-
-        List<String> excludes = new ArrayList<>(project.getModules());
-
-        excludes.removeIf(it -> it.startsWith("../"));
-        excludes.removeIf(it -> new File(new File(service.getRootPath(project), it), "src/main/java").exists());
-
-        return excludes;
     }
 
     String fixupEnvironment(String template) {
@@ -381,7 +361,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return template.replaceFirst("@STAGES@", stages.toString());
     }
 
-    private String getStageName(String stage) {
+    String getStageName(String stage) {
 
         String[] tokens = stage.split("-");
 
