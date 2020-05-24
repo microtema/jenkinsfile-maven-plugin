@@ -50,7 +50,7 @@ Reducing Boilerplate Code with jenkinnsfile maven plugin
 pipeline {
 
     agent {
-        label 'mvn8'
+        label 'mvn'
     }
 
     environment {
@@ -61,11 +61,7 @@ pipeline {
         CURRENT_TIME = sh(script: 'date +%Y-%m-%d-%H-%M', returnStdout: true).trim()
         CHANGE_AUTHOR_EMAIL = sh(script: 'git --no-pager show -s --format=\'%ae\'', returnStdout: true).trim()
 
-        // NOTE: If you use the same Jenkinsfile in multiple CI-Servers
-        //       we need a conditional deployment, only on different  stages
-        DEPLOYABLE = sh(script: 'oc whoami', returnStdout: true).trim().startsWith("system:serviceaccount:${env.BASE_NAMESPACE}")
-
-        BOOTSTRAP_URL = ''
+        BOOTSTRAP_URL = 'https://github.com/microtema/bootstrap.git'
         MAVEN_ARGS = '-s ./bootstrap/settings.xml'
     }
 
@@ -76,7 +72,7 @@ pipeline {
     }
 
     triggers {
-        upstream(upstreamProjects: "", threshold: hudson.model.Result.SUCCESS)
+        upstream(upstreamProjects: "parent-project", threshold: hudson.model.Result.SUCCESS)
     }
 
     stages {
@@ -104,7 +100,6 @@ pipeline {
       
                   sh 'echo project version: $VERSION'
                   sh 'echo current time: $CURRENT_TIME'
-                  sh 'echo deployable: $DEPLOYABLE'
               }
           }
 
@@ -185,66 +180,53 @@ pipeline {
               }
       
               parallel {
-                  stage('ETU (develop)') {
+                  stage('Develop') {
                       when {
                           branch 'develop'
                       }
                       steps {
                           withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
                               withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-dev"]) {
-                                  deployToStage()
+                                  deployToDevelopStage()
                               }
                           }
                       }
                   }
       
-                  stage('ETU (release-*)') {
+                  stage('Pre Release)') {
                       when {
                           branch 'release-*'
                       }
                       steps {
                           withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
-                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}"]) {
-                                  deployToStage()
+                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-release-*"]) {
+                                  deployToReleaseStage()
                               }
                           }
                       }
                   }
       
-                  stage('ETU (feature-*)') {
+                  stage('Feature') {
                       when {
                           branch 'feature-*'
                       }
                       steps {
                           withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
-                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-dev"]) {
-                                  deployToStage()
+                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-feature-*"]) {
+                                  deployToFeatureStage()
                               }
                           }
                       }
                   }
       
-                  stage('ITU (master)') {
-                      when {
-                          branch 'master'
-                      }
-                      steps {
-                          withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
-                              withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-rc"]) {
-                                  deployToStage()
-                              }
-                          }
-                      }
-                  }
-      
-                  stage('SATU (master)') {
+                  stage('Master') {
                       when {
                           branch 'master'
                       }
                       steps {
                           withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {
                               withEnv(["OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-prod"]) {
-                                  deployToStage()
+                                  deployToProdStage()
                               }
                           }
                       }
@@ -311,7 +293,7 @@ pipeline {
               }
           }
 
-          stage('Pull Request [PROD]') {
+          stage('Deployment [AWS]') {
       
               when {
                   allOf {
@@ -324,12 +306,12 @@ pipeline {
       
               parallel {
       
-                  stage('FOO') {
+                  stage('AWS (eu-central-1)') {
                       steps {
                           deployToStage opsRepositoryName: 'foo'
                       }
                   }
-                  stage('BAR') {
+                  stage('AWS (us-central-1)') {
                       steps {
                           deployToStage opsRepositoryName: 'nf-bar'
                       }
@@ -337,7 +319,6 @@ pipeline {
       
               }
           }
-
     }
 
     post {
