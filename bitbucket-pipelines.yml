@@ -1,0 +1,72 @@
+# This is a sample build configuration for Java (Maven).
+# Check our guides at https://confluence.atlassian.com/x/zd-5Mw for more examples.
+# Only use spaces to indent your .yml configuration.
+# -----
+# You can specify a custom docker image from Docker Hub as your build environment.
+image: maven:3.3.9
+options:
+  max-time: 20 # configure default 20 minute timeout
+clone:
+  depth: full    # SonarCloud scanner needs the full history to assign issues properly
+definitions:
+  caches:
+    sonar: ~/.sonar/cache  # Caching SonarCloud artifacts will speed up your build
+  steps:
+    - step: &test
+        name: Test
+        script:
+          - mvn test
+        artifacts:
+          - target/**
+        cache:
+          - maven
+          - sonar
+    - step: &build
+        name: Build
+        script:
+          - mvn package -P release -DskipTests=true
+        artifacts:
+          - target/**
+        cache:
+          - maven
+          - sonar
+    - step: &sonar
+        name: Sonar Report
+        script:
+          - mvn sonar:sonar -DskipTests=true -Dsonar.branch.name=$BITBUCKET_BRANCH
+        artifacts:
+          - target/**
+        cache:
+          - maven
+          - sonar
+pipelines:
+  branches:
+    feature/*:
+      - step: *test
+      - step: *build
+      - step: *sonar
+    develop:
+      - step: *test
+      - step: *build
+      - step: *sonar
+    master:
+      - step: *test
+      - step: *build
+      - step: *sonar
+      - step:
+        name: Deploy
+        script:
+          - mvn deploy -DskipTests=true
+      - step:
+        name: Tag
+        caches:
+          - maven
+        script:
+          - export VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          - git tag $VERSION $BITBUCKET_COMMIT
+          - git push origin $VERSION
+  pull-requests:
+    '**':
+      - step: *test
+      - step: *build
+      - step: *sonar
