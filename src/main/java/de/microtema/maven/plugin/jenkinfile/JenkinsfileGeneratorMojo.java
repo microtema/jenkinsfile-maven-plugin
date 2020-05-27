@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Mojo(name = "generate", defaultPhase = LifecyclePhase.COMPILE)
 public class JenkinsfileGeneratorMojo extends AbstractMojo {
@@ -30,10 +31,10 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     MavenProject project;
 
     @Parameter(property = "upstream-projects")
-    String[] upstreamProjects = new String[0];
+    List<String> upstreamProjects = new ArrayList<>();
 
     @Parameter(property = "prod-stages")
-    String[] prodStages = new String[0];
+    List<String> prodStages = new ArrayList<>();
 
     @Parameter(property = "base-namespace")
     String baseNamespace;
@@ -106,11 +107,12 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         String stagesTemplate = buildStages();
         String pipeline = getJenkinsStage("pipeline");
 
-        pipeline = pipeline.replace("@AGENT@", agent)
-                .replace("@ENVIRONMENT@", environment)
-                .replace("@OPTIONS@", options)
-                .replace("@TRIGGERS@", triggers)
-                .replace(STAGES_TAG, stagesTemplate);
+        pipeline = pipeline.replace("@AGENT@", paddLine(agent, 4))
+                .replace("@ENVIRONMENT@", paddLine(environment, 4))
+                .replace("@OPTIONS@", paddLine(options, 4))
+                .replace("@TRIGGERS@", paddLine(triggers, 4))
+                .replace(STAGES_TAG, paddLine(stagesTemplate, 4))
+                .replaceFirst("\\n$", "");
 
         try (PrintWriter out = new PrintWriter(rootPath + "/Jenkinsfile")) {
             out.println(pipeline);
@@ -121,11 +123,15 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
 
     void initDefaults() {
+
         if (stages.isEmpty()) {
             stages.put("etu", "develop");
             stages.put("itu", "release-*");
             stages.put("satu", "master");
         }
+
+        // Prevent recursive upstreams
+        upstreamProjects.removeIf(it -> StringUtils.equalsIgnoreCase(it, project.getArtifactId()));
     }
 
     String buildStages() {
@@ -144,7 +150,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
             if (StringUtils.isNotEmpty(stageTemplate)) {
                 body.append("\n");
-                body.append(paddLine(stageTemplate, 6));
+                body.append(paddLine(stageTemplate, 4));
+                body.append("\n");
             }
         }
 
@@ -179,7 +186,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             }
         }
 
-        return builder.toString();
+        return builder.toString().replaceFirst("\\n$", "");
     }
 
     String getTestStageName() {
@@ -197,14 +204,14 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         StringBuilder upstreamProjectsParam = new StringBuilder();
 
-        for (int index = 0; index < upstreamProjects.length; index++) {
+        for (int index = 0; index < upstreamProjects.size(); index++) {
 
-            String upstreamProject = upstreamProjects[index];
+            String upstreamProject = upstreamProjects.get(index);
 
             upstreamProjectsParam.append(upstreamProject);
             upstreamProjectsParam.append("/${env.BRANCH_NAME.replaceAll('/', '%2F')}");
 
-            if (index < upstreamProjects.length - 1) {
+            if (index < upstreamProjects.size() - 1) {
                 upstreamProjectsParam.append(",");
             }
         }
@@ -267,10 +274,10 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             }
 
             String line = entry.getKey() + " = " + value;
-            environmentsAsString.append(paddLine(line, 8));
+            environmentsAsString.append(paddLine(line, 4)).append("\n");
         }
 
-        return template.replace("@ENVIRONMENTS@", environmentsAsString.toString());
+        return template.replace("@ENVIRONMENTS@", environmentsAsString.toString().replaceFirst("\\n$", ""));
     }
 
     String fixupInitializeStage(String template) {
@@ -278,7 +285,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         String bootstrap = StringUtils.EMPTY;
 
         if (StringUtils.isNotEmpty(bootstrapUrl)) {
-            bootstrap = getJenkinsStage("initialize-bootstrap");
+            bootstrap = paddLine(getJenkinsStage("initialize-bootstrap"), 8);
         }
 
         return template.replace("@BOOTSTRAP_URL@", maskEnvironmentVariable(bootstrapUrl)).replace("@BOOTSTRAP@", bootstrap);
@@ -298,8 +305,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             String stageTemplate = getJenkinsStage("readiness-stage")
                     .replace(STAGE_NAME, maskEnvironmentVariable(stage.getKey().toUpperCase()))
                     .replace("@BRANCH_PATTERN@", maskEnvironmentVariable(stage.getValue()))
-                    .replace("@STEPS@", scriptTemplate);
-            body.append(paddLine(stageTemplate, 6));
+                    .replace("@STEPS@", paddLine(scriptTemplate, 4));
+            body.append(paddLine(stageTemplate, 4));
+            body.append("\n");
         }
 
         return template.replace(STAGES_TAG, body.toString());
@@ -345,7 +353,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     String fixupDeploymentProd(String template) {
 
-        if (prodStages.length == 0 || !service.existsDockerfile(project)) {
+        if (prodStages.isEmpty() || !service.existsDockerfile(project)) {
             return null;
         }
 
@@ -356,7 +364,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         for (String stage : prodStages) {
             String stageName = maskEnvironmentVariable(getStageName(stage));
             String namespace = maskEnvironmentVariable(stage);
-            stringBuilder.append(stageTemplate.replaceFirst(STAGE_NAME, stageName).replaceFirst("@STAGE@", namespace));
+            stringBuilder.append("\n");
+            stringBuilder.append(paddLine(stageTemplate, 8).replaceFirst(STAGE_NAME, stageName).replaceFirst("@STAGE@", namespace));
+            stringBuilder.append("\n");
         }
 
         return template.replaceFirst(STAGES_TAG, stringBuilder.toString());
@@ -408,6 +418,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 return fixupInitializeStage(template);
             case "sonar":
                 return fixSonarStage(template);
+
             case "test":
             case "unit-test":
                 return getStageOrNull(template, service.hasSourceCode(project));
@@ -428,7 +439,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             case "aqua":
                 return fixupAquaStage(template);
             case "promote":
-                return getStageOrNull(template, prodStages.length > 0 && service.existsDockerfile(project));
+                return getStageOrNull(template, !prodStages.isEmpty() && service.existsDockerfile(project));
             case "deployment-prod":
                 return fixupDeploymentProd(template);
             default:

@@ -1,8 +1,8 @@
-        stage(@STAGE_NAME@) {
+stage(@STAGE_NAME@) {
 
-            when {
-                branch @BRANCH_PATTERN@
-            }
+    when {
+        branch @BRANCH_PATTERN@
+    }
 
-            @STEPS@
-        }
+@STEPS@
+}

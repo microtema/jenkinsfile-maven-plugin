@@ -78,7 +78,7 @@ class JenkinsfileGeneratorMojoTest {
         when(service.isGitRepo(project)).thenReturn(true);
 
         sut.update = true;
-        sut.prodStages = new String[]{"foo", "nf-bar"};
+        sut.prodStages = Arrays.asList("foo", "nf-bar");
 
         sut.execute();
 
@@ -155,7 +155,7 @@ class JenkinsfileGeneratorMojoTest {
     @Test
     void paddLine() {
 
-        assertEquals("    stage('name') {}\n", sut.paddLine("stage('name') {}", 4));
+        assertEquals("    stage('name') {}", sut.paddLine("stage('name') {}", 4));
     }
 
     @Test
@@ -175,23 +175,35 @@ class JenkinsfileGeneratorMojoTest {
     @Test
     void buildTriggersOnEmptyUpstreams() {
 
-        assertEquals("triggers {        upstream(upstreamProjects: \"\", threshold: hudson.model.Result.SUCCESS)    }", sut.buildTriggers().replaceAll("\n", ""));
+        String answer = sut.buildTriggers();
+
+        assertEquals("triggers {\n" +
+                "    upstream(upstreamProjects: \"\", threshold: hudson.model.Result.SUCCESS)\n" +
+                "}\n", answer);
     }
 
     @Test
     void buildTriggers() {
 
-        sut.upstreamProjects = new String[]{"foo"};
+        sut.upstreamProjects = Arrays.asList("foo");
 
-        assertEquals("triggers {        upstream(upstreamProjects: \"foo/${env.BRANCH_NAME.replaceAll('/', '%2F')}\", threshold: hudson.model.Result.SUCCESS)    }", sut.buildTriggers().replaceAll("\n", ""));
+        String answer = sut.buildTriggers();
+
+        assertEquals("triggers {\n" +
+                "    upstream(upstreamProjects: \"foo/${env.BRANCH_NAME.replaceAll('/', '%2F')}\", threshold: hudson.model.Result.SUCCESS)\n" +
+                "}\n", answer);
     }
 
     @Test
     void buildTriggersOnMultiplesUpstreams() {
 
-        sut.upstreamProjects = new String[]{"foo", "bar"};
+        sut.upstreamProjects = Arrays.asList("foo", "bar");
 
-        assertEquals("triggers {        upstream(upstreamProjects: \"foo/${env.BRANCH_NAME.replaceAll('/', '%2F')},bar/${env.BRANCH_NAME.replaceAll('/', '%2F')}\", threshold: hudson.model.Result.SUCCESS)    }", sut.buildTriggers().replaceAll("\n", ""));
+        String answer = sut.buildTriggers();
+
+        assertEquals("triggers {\n" +
+                "    upstream(upstreamProjects: \"foo/${env.BRANCH_NAME.replaceAll('/', '%2F')},bar/${env.BRANCH_NAME.replaceAll('/', '%2F')}\", threshold: hudson.model.Result.SUCCESS)\n" +
+                "}\n", answer);
     }
 
     @Test
@@ -244,9 +256,13 @@ class JenkinsfileGeneratorMojoTest {
 
         when(service.existsDockerfile(project)).thenReturn(false);
 
-        String answer = sut.getJenkinsStage("environment").replaceAll(System.lineSeparator(), "");
+        String answer = sut.getJenkinsStage("environment");
 
-        assertEquals("environment {        CURRENT_TIME = sh(script: 'date +%Y-%m-%d-%H-%M', returnStdout: true).trim()        CHANGE_AUTHOR_EMAIL = sh(script: \"git --no-pager show -s --format='%ae'\", returnStdout: true).trim()    }", answer.replaceAll("\n", ""));
+        assertEquals("environment {\n" +
+                "    CURRENT_TIME = sh(script: 'date +%Y-%m-%d-%H-%M', returnStdout: true).trim()\n" +
+                "    CHANGE_AUTHOR_EMAIL = sh(script: \"git --no-pager show -s --format='%ae'\", returnStdout: true).trim()\n" +
+                "\n" +
+                "}\n", answer);
     }
 
     @Test
@@ -254,18 +270,39 @@ class JenkinsfileGeneratorMojoTest {
 
         when(service.existsDockerfile(project)).thenReturn(true);
 
-        String answer = sut.getJenkinsStage("environment").replaceAll(System.lineSeparator(), "");
+        sut.bootstrapUrl = "http://localhost";
 
-        assertEquals("environment {        CURRENT_TIME = sh(script: 'date +%Y-%m-%d-%H-%M', returnStdout: true).trim()        CHANGE_AUTHOR_EMAIL = sh(script: \"git --no-pager show -s --format='%ae'\", returnStdout: true).trim()        APP = 'app'        BASE_NAMESPACE = 'ns'        DEPLOYABLE = sh(script: 'oc whoami', returnStdout: true).trim().startsWith(\"system:serviceaccount:${env.BASE_NAMESPACE}\")    }", answer.replaceAll("\n", ""));
+        String answer = sut.getJenkinsStage("environment");
+
+        assertEquals("environment {\n" +
+                "    CURRENT_TIME = sh(script: 'date +%Y-%m-%d-%H-%M', returnStdout: true).trim()\n" +
+                "    CHANGE_AUTHOR_EMAIL = sh(script: \"git --no-pager show -s --format='%ae'\", returnStdout: true).trim()\n" +
+                "    APP = 'app'\n" +
+                "    BASE_NAMESPACE = 'ns'\n" +
+                "    DEPLOYABLE = sh(script: 'oc whoami', returnStdout: true).trim().startsWith(\"system:serviceaccount:${env.BASE_NAMESPACE}\")\n" +
+                "}\n",answer);
     }
 
     @Test
     void fixupInitializeStage() {
 
-        String answer = sut.getJenkinsStage("initialize").replaceAll(System.lineSeparator(), "");
+        String answer = sut.getJenkinsStage("initialize");
 
-        assertEquals("    stage('Initialize') {        environment {            BOOTSTRAP_URL = ''        }        steps {                        sh 'whoami'            sh 'oc whoami'            sh 'mvn -version'            sh 'echo commit-id: $GIT_COMMIT'            sh 'echo change author: $CHANGE_AUTHOR_EMAIL'        }    }", answer.replaceAll("\n", ""));
-
+        assertEquals("stage('Initialize') {\n" +
+                "\n" +
+                "    environment {\n" +
+                "        BOOTSTRAP_URL = ''\n" +
+                "    }\n" +
+                "\n" +
+                "    steps {\n" +
+                "\n" +
+                "        sh 'whoami'\n" +
+                "        sh 'oc whoami'\n" +
+                "        sh 'mvn -version'\n" +
+                "        sh 'echo commit-id: $GIT_COMMIT'\n" +
+                "        sh 'echo change author: $CHANGE_AUTHOR_EMAIL'\n" +
+                "    }\n" +
+                "}\n",answer);
     }
 
     @Test
@@ -273,9 +310,36 @@ class JenkinsfileGeneratorMojoTest {
 
         sut.bootstrapUrl = "localhost";
 
-        String answer = sut.getJenkinsStage("initialize").replaceAll("\n", "");
+        String answer = sut.getJenkinsStage("initialize");
 
-        assertEquals("    stage('Initialize') {        environment {            BOOTSTRAP_URL = 'localhost'        }        steps {            script {                if (env.BOOTSTRAP_URL.toLowerCase() == env.GIT_URL.toLowerCase()) {                    env.MAVEN_ARGS = '-s ./settings.xml'                } else {                    dir('bootstrap') {                        try {                            git branch: env.BRANCH_NAME, url: env.BOOTSTRAP_URL, credentialsId: 'SCM_CREDENTIALS'                        } catch (e) {                            git branch: 'develop', url: env.BOOTSTRAP_URL, credentialsId: 'SCM_CREDENTIALS'                        }                        env.MAVEN_ARGS = '-s ./bootstrap/settings.xml'                    }                }           }            sh 'whoami'            sh 'oc whoami'            sh 'mvn -version'            sh 'echo commit-id: $GIT_COMMIT'            sh 'echo change author: $CHANGE_AUTHOR_EMAIL'        }    }", answer);
+        assertEquals("stage('Initialize') {\n" +
+                "\n" +
+                "    environment {\n" +
+                "        BOOTSTRAP_URL = 'localhost'\n" +
+                "    }\n" +
+                "\n" +
+                "    steps {\n" +
+                "        script {\n" +
+                "            if (env.BOOTSTRAP_URL.toLowerCase() == env.GIT_URL.toLowerCase()) {\n" +
+                "                env.MAVEN_ARGS = '-s ./settings.xml'\n" +
+                "            } else {\n" +
+                "                dir('bootstrap') {\n" +
+                "                    try {\n" +
+                "                        git branch: env.BRANCH_NAME, url: env.BOOTSTRAP_URL, credentialsId: 'SCM_CREDENTIALS'\n" +
+                "                    } catch (e) {\n" +
+                "                        git branch: 'develop', url: env.BOOTSTRAP_URL, credentialsId: 'SCM_CREDENTIALS'\n" +
+                "                    }\n" +
+                "                    env.MAVEN_ARGS = '-s ./bootstrap/settings.xml'\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "        sh 'whoami'\n" +
+                "        sh 'oc whoami'\n" +
+                "        sh 'mvn -version'\n" +
+                "        sh 'echo commit-id: $GIT_COMMIT'\n" +
+                "        sh 'echo change author: $CHANGE_AUTHOR_EMAIL'\n" +
+                "    }\n" +
+                "}\n", answer);
     }
 
     @Test
@@ -303,44 +367,43 @@ class JenkinsfileGeneratorMojoTest {
         when(service.existsDockerfile(project)).thenReturn(true);
 
         assertEquals("\n" +
-                "              stage('FOO') {\n" +
-                "      \n" +
-                "                  when {\n" +
-                "                      branch 'develop'\n" +
-                "                  }\n" +
-                "      \n" +
-                "                  steps {\n" +
-                "                      script {\n" +
-                "      \n" +
-                "                          def namespace = \"${env.BASE_NAMESPACE}-etu\"\n" +
-                "      \n" +
-                "                          def waitForPodReadinessImpl = {\n" +
-                "      \n" +
-                "                              def pods = sh(script: \"oc get pods --namespace ${namespace} | grep -E '${env.APP}.*' | grep -v build | grep -v deploy\", returnStdout: true)\n" +
-                "                              .trim().split('\\n')\n" +
-                "                              .collect { it.split(' ')[0] }\n" +
-                "      \n" +
-                "                              echo \"${pods}\"\n" +
-                "      \n" +
-                "                              pods.find {\n" +
-                "                                  try {\n" +
-                "                                      sh(script: \"oc describe pod ${it} --namespace ${namespace} | grep -c 'git-commit=${env.GIT_COMMIT}'\", returnStdout: true).trim().toInteger()\n" +
-                "                                  } catch (e) {\n" +
-                "                                      false\n" +
-                "                                  }\n" +
-                "                              }\n" +
-                "                          }\n" +
-                "      \n" +
-                "                          while (!waitForPodReadinessImpl.call()) {\n" +
-                "                              echo 'Pod is not available or not ready! Retry after few seconds...'\n" +
-                "                              sleep(time: 30, unit: \"SECONDS\")\n" +
-                "                          }\n" +
-                "      \n" +
-                "                          echo 'Pod is ready and updated'\n" +
-                "                      }\n" +
-                "                  }\n" +
-                "      \n" +
-                "              }\n", sut.fixupReadinessStage("@STAGES@"));
+                "    stage('FOO') {\n" +
+                "    \n" +
+                "        when {\n" +
+                "            branch 'develop'\n" +
+                "        }\n" +
+                "    \n" +
+                "        steps {\n" +
+                "        \n" +
+                "            script {\n" +
+                "        \n" +
+                "                def namespace = \"${env.BASE_NAMESPACE}-etu\"\n" +
+                "        \n" +
+                "                def waitForPodReadinessImpl = {\n" +
+                "        \n" +
+                "                    def pods = sh(script: \"oc get pods --namespace ${namespace} | grep -E '${env.APP}.*' | grep -v build | grep -v deploy\", returnStdout: true)\n" +
+                "                    .trim().split('\\n')\n" +
+                "                    .collect { it.split(' ')[0] }\n" +
+                "        \n" +
+                "                    pods.find {\n" +
+                "                        try {\n" +
+                "                            sh(script: \"oc describe pod ${it} --namespace ${namespace} | grep -c 'git-commit=${env.GIT_COMMIT}'\", returnStdout: true).trim().toInteger()\n" +
+                "                        } catch (e) {\n" +
+                "                            false\n" +
+                "                        }\n" +
+                "                    }\n" +
+                "                }\n" +
+                "        \n" +
+                "                while (!waitForPodReadinessImpl.call()) {\n" +
+                "                    echo 'Pod is not available or not ready! Retry after few seconds...'\n" +
+                "                    sleep(time: 30, unit: \"SECONDS\")\n" +
+                "                }\n" +
+                "        \n" +
+                "                echo \"${pods}\"\n" +
+                "                echo 'Pod is ready and updated'\n" +
+                "            }\n" +
+                "        }\n" +
+                "    }\n", sut.fixupReadinessStage("@STAGES@"));
     }
 
     @Test
@@ -359,17 +422,17 @@ class JenkinsfileGeneratorMojoTest {
         when(service.existsDbMigrationScripts(project)).thenReturn(true);
 
         assertEquals("\n" +
-                "              stage('FOO') {\n" +
+                "      stage('FOO') {\n" +
                 "      \n" +
-                "                  when {\n" +
-                "                      branch 'develop'\n" +
-                "                  }\n" +
+                "          when {\n" +
+                "              branch 'develop'\n" +
+                "          }\n" +
                 "      \n" +
-                "                  steps {\n" +
-                "                      sh 'mvn flyway:migrate -P foo -Doracle.jdbc.fanEnabled=false $MAVEN_ARGS'\n" +
-                "                  }\n" +
+                "      steps {\n" +
+                "          sh 'mvn flyway:migrate -P foo -Doracle.jdbc.fanEnabled=false $MAVEN_ARGS'\n" +
+                "      }\n" +
                 "      \n" +
-                "              }\n", sut.fixupDbMigrationStage("@STAGES@"));
+                "      }", sut.fixupDbMigrationStage("@STAGES@"));
     }
 
     @Test
@@ -391,11 +454,16 @@ class JenkinsfileGeneratorMojoTest {
 
         when(service.existsDockerfile(project)).thenReturn(true);
 
-        sut.prodStages = new String[]{"aws"};
+        sut.prodStages = Collections.singletonList("aws");
 
-        String answer = sut.fixupDeploymentProd("@STAGES@").replaceAll("\n", "");
+        String answer = sut.fixupDeploymentProd("@STAGES@");
 
-        assertEquals("            stage('AWS') {                steps {                    createOpsRepoMergeRequest opsRepositoryName: 'aws'                }            }", answer);
+        assertEquals("\n" +
+                "        stage('AWS') {\n" +
+                "            steps {\n" +
+                "                createOpsRepoMergeRequest opsRepositoryName: 'aws'\n" +
+                "            }\n" +
+                "        }\n", answer);
     }
 
     @Test
@@ -419,9 +487,11 @@ class JenkinsfileGeneratorMojoTest {
     @Test
     void getJenkinsStage() {
 
-        String answer = sut.getJenkinsStage("agent").replaceAll("\n", "");
+        String answer = sut.getJenkinsStage("agent");
 
-        assertEquals("agent {        label 'mvn8'    }", answer);
+        assertEquals("agent {\n" +
+                "    label 'mvn8'\n" +
+                "}\n", answer);
     }
 
 

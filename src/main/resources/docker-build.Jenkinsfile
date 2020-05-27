@@ -1,45 +1,17 @@
-    stage('Build [Docker-Image]') {
+stage('Build [Docker-Image]') {
 
-        when {
+    when {
+         anyOf {
+            branch 'feature-*'
+            branch 'develop'
+            branch 'release-*'
+            branch 'hotfix-*'
+            branch 'master'
             environment name: 'DEPLOYABLE', value: 'true'
-        }
-
-        parallel {
-            stage('Feature') {
-                when {
-                    branch 'feature-*'
-                }
-                steps {
-                    buildDockerImage semVer: true
-                }
-            }
-
-            stage('Develop') {
-                when {
-                    branch 'develop'
-                }
-                steps {
-                    buildDockerImage semVer: true
-                }
-            }
-
-            stage('Pre-Release') {
-                when {
-                    branch 'release-*'
-                }
-                steps {
-                    buildDockerImage semVer: true
-                }
-            }
-
-            stage('Release') {
-                when {
-                    branch 'master'
-                }
-                steps {
-                    buildDockerImage semVer: true
-                }
-            }
-        }
+         }
     }
 
+    steps {
+        buildDockerImage semVer: true
+    }
+}

@@ -1,5 +1,5 @@
-            stage(@STAGE_NAME@) {
-                steps {
-                    createOpsRepoMergeRequest opsRepositoryName: @STAGE@
-                }
-            }
+stage(@STAGE_NAME@) {
+    steps {
+        createOpsRepoMergeRequest opsRepositoryName: @STAGE@
+    }
+}

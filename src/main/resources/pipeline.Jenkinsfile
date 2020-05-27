@@ -1,11 +1,15 @@
 pipeline {
 
-    @AGENT@
-    @ENVIRONMENT@
-    @OPTIONS@
-    @TRIGGERS@
+@AGENT@
+
+@ENVIRONMENT@
+
+@OPTIONS@
+
+@TRIGGERS@
+
     stages {
-        @STAGES@
+@STAGES@
     }
 
     post {

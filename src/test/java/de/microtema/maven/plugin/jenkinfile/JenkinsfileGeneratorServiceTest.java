@@ -32,6 +32,7 @@ class JenkinsfileGeneratorServiceTest {
     File jenkinsfile = new File("./Jenkinsfile");
 
     File sourceFolder = new File("./src/main/test");
+
     File moduleFolder = new File("./module/src/main/test");
 
     @AfterEach

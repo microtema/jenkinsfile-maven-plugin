@@ -1,10 +1,10 @@
-    stage('DB Migration') {
+stage('DB Migration') {
 
-        when {
-            environment name: 'DEPLOYABLE', value: 'true'
-        }
-
-        parallel {
-            @STAGES@
-        }
+    when {
+        environment name: 'DEPLOYABLE', value: 'true'
     }
+
+    parallel {
+@STAGES@
+    }
+}
