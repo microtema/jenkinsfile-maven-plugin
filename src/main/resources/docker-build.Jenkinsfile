@@ -6,7 +6,6 @@ stage('Build [Docker-Image]') {
             branch 'develop'
             branch 'release-*'
             branch 'hotfix-*'
-            branch 'master'
             environment name: 'DEPLOYABLE', value: 'true'
          }
     }

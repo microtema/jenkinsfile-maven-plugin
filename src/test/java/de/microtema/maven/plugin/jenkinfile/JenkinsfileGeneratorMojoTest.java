@@ -367,43 +367,133 @@ class JenkinsfileGeneratorMojoTest {
         when(service.existsDockerfile(project)).thenReturn(true);
 
         assertEquals("\n" +
-                "    stage('FOO') {\n" +
-                "    \n" +
-                "        when {\n" +
-                "            branch 'develop'\n" +
-                "        }\n" +
-                "    \n" +
-                "        steps {\n" +
+                "        stage('FOO') {\n" +
                 "        \n" +
-                "            script {\n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'foo'\n" +
+                "            }\n" +
                 "        \n" +
-                "                def namespace = \"${env.BASE_NAMESPACE}-etu\"\n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
                 "        \n" +
-                "                def waitForPodReadinessImpl = {\n" +
+                "            steps {\n" +
                 "        \n" +
-                "                    def pods = sh(script: \"oc get pods --namespace ${namespace} | grep -E '${env.APP}.*' | grep -v build | grep -v deploy\", returnStdout: true)\n" +
-                "                    .trim().split('\\n')\n" +
-                "                    .collect { it.split(' ')[0] }\n" +
+                "                script {\n" +
                 "        \n" +
-                "                    pods.find {\n" +
-                "                        try {\n" +
-                "                            sh(script: \"oc describe pod ${it} --namespace ${namespace} | grep -c 'git-commit=${env.GIT_COMMIT}'\", returnStdout: true).trim().toInteger()\n" +
-                "                        } catch (e) {\n" +
-                "                            false\n" +
+                "                    def namespace = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
+                "        \n" +
+                "                    def waitForPodReadinessImpl = {\n" +
+                "        \n" +
+                "                        def pods = sh(script: \"oc get pods --namespace ${namespace} | grep -E '${env.APP}.*' | grep -v build | grep -v deploy\", returnStdout: true)\n" +
+                "                        .trim().split('\\n')\n" +
+                "                        .collect { it.split(' ')[0] }\n" +
+                "        \n" +
+                "                        pods.find {\n" +
+                "                            try {\n" +
+                "                                sh(script: \"oc describe pod ${it} --namespace ${namespace} | grep -c 'git-commit=${env.GIT_COMMIT}'\", returnStdout: true).trim().toInteger()\n" +
+                "                            } catch (e) {\n" +
+                "                                false\n" +
+                "                            }\n" +
                 "                        }\n" +
                 "                    }\n" +
-                "                }\n" +
                 "        \n" +
-                "                while (!waitForPodReadinessImpl.call()) {\n" +
-                "                    echo 'Pod is not available or not ready! Retry after few seconds...'\n" +
-                "                    sleep(time: 30, unit: \"SECONDS\")\n" +
-                "                }\n" +
+                "                    while (!waitForPodReadinessImpl.call()) {\n" +
+                "                        echo 'Pod is not available or not ready! Retry after few seconds...'\n" +
+                "                        sleep(time: 30, unit: \"SECONDS\")\n" +
+                "                    }\n" +
                 "        \n" +
-                "                echo \"${pods}\"\n" +
-                "                echo 'Pod is ready and updated'\n" +
+                "                    echo \"${pods}\"\n" +
+                "                    echo 'Pod is ready and updated'\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n", sut.fixupReadinessStage("@STAGES@"));
+    }
+
+    @Test
+    void fixupDeplymentStageWithStages() {
+
+        sut.stages.put("dev", "develop");
+
+        when(service.existsDockerfile(project)).thenReturn(true);
+
+        assertEquals("stage('Deployment') {\n" +
+                "\n" +
+                "    when {\n" +
+                "        environment name: 'DEPLOYABLE', value: 'true'\n" +
+                "    }\n" +
+                "\n" +
+                "    parallel {\n" +
+                "\n" +
+                "        stage('DEV (develop)') {\n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'dev'\n" +
+                "            }\n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "            steps {\n" +
+                "                withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {\n" +
+                "                    withEnv([\"OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"]) {\n" +
+                "                        createAndMergeOpsRepoMergeRequest()\n" +
+                "                    }\n" +
+                "                }\n" +
                 "            }\n" +
                 "        }\n" +
-                "    }\n", sut.fixupReadinessStage("@STAGES@"));
+                "\n" +
+                "    }\n" +
+                "}\n", sut.getJenkinsStage("deployment"));
+    }
+
+    @Test
+    void fixupDeplymentStageWithMultipleStages() {
+
+        sut.stages.put("qa", "release-*,hotfix-*");
+
+        when(service.existsDockerfile(project)).thenReturn(true);
+
+        assertEquals("stage('Deployment') {\n" +
+                "\n" +
+                "    when {\n" +
+                "        environment name: 'DEPLOYABLE', value: 'true'\n" +
+                "    }\n" +
+                "\n" +
+                "    parallel {\n" +
+                "\n" +
+                "        stage('QA (release-*)') {\n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'qa'\n" +
+                "            }\n" +
+                "            when {\n" +
+                "                branch 'release-*'\n" +
+                "            }\n" +
+                "            steps {\n" +
+                "                withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {\n" +
+                "                    withEnv([\"OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"]) {\n" +
+                "                        createAndMergeOpsRepoMergeRequest()\n" +
+                "                    }\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        stage('QA (hotfix-*)') {\n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'qa'\n" +
+                "            }\n" +
+                "            when {\n" +
+                "                branch 'hotfix-*'\n" +
+                "            }\n" +
+                "            steps {\n" +
+                "                withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {\n" +
+                "                    withEnv([\"OPS_REPOSITORY_NAME=${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"]) {\n" +
+                "                        createAndMergeOpsRepoMergeRequest()\n" +
+                "                    }\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "    }\n" +
+                "}\n", sut.getJenkinsStage("deployment"));
     }
 
     @Test
@@ -417,22 +507,35 @@ class JenkinsfileGeneratorMojoTest {
     @Test
     void fixupDbMigrationStageWithStages() {
 
-        sut.stages.put("foo", "develop");
+        sut.stages.put("dev", "develop");
 
         when(service.existsDbMigrationScripts(project)).thenReturn(true);
 
-        assertEquals("\n" +
-                "      stage('FOO') {\n" +
+        assertEquals("stage('DB Migration') {\n" +
+                "\n" +
+                "    when {\n" +
+                "        environment name: 'DEPLOYABLE', value: 'true'\n" +
+                "    }\n" +
+                "\n" +
+                "    parallel {\n" +
+                "\n" +
+                "      stage('DEV') {\n" +
+                "      \n" +
+                "          environment {\n" +
+                "              MAVEN_PROFILE = 'dev'\n" +
+                "          }\n" +
                 "      \n" +
                 "          when {\n" +
                 "              branch 'develop'\n" +
                 "          }\n" +
                 "      \n" +
-                "      steps {\n" +
-                "          sh 'mvn flyway:migrate -P foo -Doracle.jdbc.fanEnabled=false $MAVEN_ARGS'\n" +
+                "          steps {\n" +
+                "              sh 'mvn flyway:migrate -P $MAVEN_PROFILE -Doracle.jdbc.fanEnabled=false $MAVEN_ARGS'\n" +
+                "          }\n" +
                 "      }\n" +
-                "      \n" +
-                "      }", sut.fixupDbMigrationStage("@STAGES@"));
+                "\n" +
+                "    }\n" +
+                "}\n", sut.getJenkinsStage("db-migration"));
     }
 
     @Test

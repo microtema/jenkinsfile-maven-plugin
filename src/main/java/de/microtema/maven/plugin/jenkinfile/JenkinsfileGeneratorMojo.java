@@ -19,13 +19,22 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @Mojo(name = "generate", defaultPhase = LifecyclePhase.COMPILE)
 public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     static final String STAGES_TAG = "@STAGES@";
     static final String STAGE_NAME = "@STAGE_NAME@";
+    static final String ENV_STAGE_NAME = "@ENV_STAGE_NAME@";
+    static final String MAVEN_PROFILE = "@MAVEN_PROFILE@";
+    static final String BRANCH_PATTERN = "@BRANCH_PATTERN@";
+    static final String AGENT = "@AGENT@";
+    static final String ENVIRONMENT = "@ENVIRONMENT@";
+    static final String OPTIONS = "@OPTIONS@";
+    static final String TRIGGERS = "@TRIGGERS@";
+    static final String BOOTSTRAP_URL = "@BOOTSTRAP_URL@";
+    static final String STEPS = "@STEPS@";
+    static final String STAGE = "@STAGE@";
 
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     MavenProject project;
@@ -107,10 +116,10 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         String stagesTemplate = buildStages();
         String pipeline = getJenkinsStage("pipeline");
 
-        pipeline = pipeline.replace("@AGENT@", paddLine(agent, 4))
-                .replace("@ENVIRONMENT@", paddLine(environment, 4))
-                .replace("@OPTIONS@", paddLine(options, 4))
-                .replace("@TRIGGERS@", paddLine(triggers, 4))
+        pipeline = pipeline.replace(AGENT, paddLine(agent, 4))
+                .replace(ENVIRONMENT, paddLine(environment, 4))
+                .replace(OPTIONS, paddLine(options, 4))
+                .replace(TRIGGERS, paddLine(triggers, 4))
                 .replace(STAGES_TAG, paddLine(stagesTemplate, 4))
                 .replaceFirst("\\n$", "");
 
@@ -124,9 +133,12 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     void initDefaults() {
 
+        /*
+         * NOTE: keys should match DB instances
+         */
         if (stages.isEmpty()) {
-            stages.put("etu", "develop");
-            stages.put("itu", "release-*");
+            stages.put("etu", "develop,feature-*");
+            stages.put("itu", "release-*,hotfix-*");
             stages.put("satu", "master");
         }
 
@@ -288,7 +300,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             bootstrap = paddLine(getJenkinsStage("initialize-bootstrap"), 8);
         }
 
-        return template.replace("@BOOTSTRAP_URL@", maskEnvironmentVariable(bootstrapUrl)).replace("@BOOTSTRAP@", bootstrap);
+        return template.replace(BOOTSTRAP_URL, maskEnvironmentVariable(bootstrapUrl)).replace("@BOOTSTRAP@", bootstrap);
     }
 
     String fixupReadinessStage(String template) {
@@ -300,17 +312,58 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         StringBuilder body = new StringBuilder();
 
         for (Map.Entry<String, String> stage : stages.entrySet()) {
+
+            String stageName = stage.getKey();
+            String branchPatter = getBranches(stage.getValue()).get(0);
+
             body.append("\n");
-            String scriptTemplate = getJenkinsStage("readiness-steps");
+
             String stageTemplate = getJenkinsStage("readiness-stage")
-                    .replace(STAGE_NAME, maskEnvironmentVariable(stage.getKey().toUpperCase()))
-                    .replace("@BRANCH_PATTERN@", maskEnvironmentVariable(stage.getValue()))
-                    .replace("@STEPS@", paddLine(scriptTemplate, 4));
-            body.append(paddLine(stageTemplate, 4));
+                    .replaceAll(STAGE_NAME, maskEnvironmentVariable(stageName.toUpperCase()))
+                    .replaceAll(ENV_STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
+                    .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
+            body.append(paddLine(stageTemplate, 8));
+
             body.append("\n");
+
         }
 
         return template.replace(STAGES_TAG, body.toString());
+    }
+
+    String fixupDeploymentStage(String template) {
+
+        if (!service.existsDockerfile(project)) {
+
+            return null;
+        }
+
+        StringBuilder body = new StringBuilder();
+
+        for (Map.Entry<String, String> stage : stages.entrySet()) {
+
+            String stageName = stage.getKey();
+
+            for (String branchPatter : getBranches(stage.getValue())) {
+
+                body.append("\n");
+
+                String stageTemplate = getJenkinsStage("deployment-stage")
+                        .replaceAll(STAGE_NAME, getStageDisplayName(stageName, branchPatter))
+                        .replaceAll(ENV_STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
+                        .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
+                body.append(paddLine(stageTemplate, 8));
+
+                body.append("\n");
+            }
+        }
+
+        return template.replace(STAGES_TAG, body.toString());
+    }
+
+    String getStageDisplayName(String stageName, String branchPatter) {
+
+        return maskEnvironmentVariable(stageName.toUpperCase() + " (" + branchPatter + ")");
     }
 
     String fixupDbMigrationStage(String template) {
@@ -322,17 +375,27 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         StringBuilder body = new StringBuilder();
 
         for (Map.Entry<String, String> stage : stages.entrySet()) {
+
+            String stageName = stage.getKey();
+            String branchPatter = getBranches(stage.getValue()).get(0);
+
             body.append("\n");
-            String scriptTemplate = getJenkinsStage("db-migration-steps")
-                    .replace(STAGE_NAME, stage.getKey().toLowerCase());
+
             String stageTemplate = getJenkinsStage("db-migration-stage")
-                    .replace(STAGE_NAME, maskEnvironmentVariable(stage.getKey().toUpperCase()))
-                    .replace("@BRANCH_PATTERN@", maskEnvironmentVariable(stage.getValue()))
-                    .replace("@STEPS@", scriptTemplate);
+                    .replace(STAGE_NAME, maskEnvironmentVariable(stageName.toUpperCase()))
+                    .replace(MAVEN_PROFILE, maskEnvironmentVariable(stageName.toLowerCase()))
+                    .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
             body.append(paddLine(stageTemplate, 6));
+
+            body.append("\n");
         }
 
         return template.replace(STAGES_TAG, body.toString());
+    }
+
+    List<String> getBranches(String branches) {
+
+        return Arrays.asList(branches.split(","));
     }
 
     String fixupAquaStage(String template) {
@@ -362,10 +425,14 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         String stageTemplate = getJenkinsStage("deployment-prod-stage");
 
         for (String stage : prodStages) {
+
             String stageName = maskEnvironmentVariable(getStageName(stage));
             String namespace = maskEnvironmentVariable(stage);
+
             stringBuilder.append("\n");
-            stringBuilder.append(paddLine(stageTemplate, 8).replaceFirst(STAGE_NAME, stageName).replaceFirst("@STAGE@", namespace));
+
+            stringBuilder.append(paddLine(stageTemplate, 8).replaceFirst(STAGE_NAME, stageName).replaceFirst(STAGE, namespace));
+
             stringBuilder.append("\n");
         }
 
@@ -416,16 +483,19 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 return fixupEnvironment(template);
             case "initialize":
                 return fixupInitializeStage(template);
-            case "sonar":
-                return fixSonarStage(template);
 
             case "test":
             case "unit-test":
                 return getStageOrNull(template, service.hasSourceCode(project));
 
+            case "sonar":
+                return fixSonarStage(template);
+
             case "docker-build":
-            case "deployment":
                 return getStageOrNull(template, service.existsDockerfile(project));
+
+            case "deployment":
+                return fixupDeploymentStage(template);
 
             case "versioning":
             case "publish":
