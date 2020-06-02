@@ -403,7 +403,6 @@ class JenkinsfileGeneratorMojoTest {
                 "                        sleep(time: 30, unit: \"SECONDS\")\n" +
                 "                    }\n" +
                 "        \n" +
-                "                    echo \"${pods}\"\n" +
                 "                    echo 'Pod is ready and updated'\n" +
                 "                }\n" +
                 "            }\n" +

@@ -1,16 +1,25 @@
 stage('Build [Docker-Image]') {
 
     when {
-         anyOf {
+        anyOf {
             branch 'feature-*'
             branch 'develop'
             branch 'release-*'
             branch 'hotfix-*'
             environment name: 'DEPLOYABLE', value: 'true'
-         }
+        }
     }
 
     steps {
-        buildDockerImage semVer: true
+
+        script {
+
+            if(env.BRANCH_NAME ==~ /(hotfix|release)-.+/){
+                env.BRANCH_NAME = 'master'
+            }
+
+            buildDockerImage semVer: true
+        }
+
     }
 }

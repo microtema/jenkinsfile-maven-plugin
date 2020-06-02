@@ -45,9 +45,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "prod-stages")
     List<String> prodStages = new ArrayList<>();
 
-    @Parameter(property = "base-namespace")
-    String baseNamespace;
-
     @Parameter(property = "aqua-project-id")
     String aquaProjectId;
 
@@ -72,8 +69,11 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "bootstrap-url")
     String bootstrapUrl;
 
-    @Parameter(property = "app")
+    @Parameter(property = "app-name")
     String appName;
+
+    @Parameter(property = "base-namespace")
+    String baseNamespace;
 
     @Parameter(property = "environments")
     LinkedHashMap<String, String> environments = new LinkedHashMap<>();
@@ -130,9 +130,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         }
     }
 
-
     void initDefaults() {
-
         /*
          * NOTE: keys should match DB instances
          */
@@ -151,7 +149,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         String test = getTestStageName();
 
         List<String> stageNames = Arrays.asList("initialize", "versioning", "compile", "db-migration", test, "maven-build",
-                "sonar", "security", "docker-build", "tag", "publish", "deployment", "readiness", "aqua",
+                "sonar", "security", "sonar-quality-gate", "docker-build", "tag", "publish", "deployment", "readiness", "aqua",
                 "promote", "deployment-prod");
 
         StringBuilder body = new StringBuilder();

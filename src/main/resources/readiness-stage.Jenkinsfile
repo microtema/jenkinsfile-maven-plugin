@@ -34,7 +34,6 @@ stage(@STAGE_NAME@) {
                 sleep(time: 30, unit: "SECONDS")
             }
 
-            echo "${pods}"
             echo 'Pod is ready and updated'
         }
     }

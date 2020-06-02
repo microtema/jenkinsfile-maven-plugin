@@ -31,17 +31,20 @@ class JenkinsfileGeneratorServiceTest {
 
     File jenkinsfile = new File("./Jenkinsfile");
 
-    File sourceFolder = new File("./src/main/test");
+    File moduleFolder = new File("./module/src/main/java");
 
-    File moduleFolder = new File("./module/src/main/test");
+    File migrationFolder = new File(JenkinsfileGeneratorService.MIGRATION_PATH);
 
     @AfterEach
     void tearDown() {
 
         dockerFile.delete();
         jenkinsfile.delete();
-        sourceFolder.delete();
         moduleFolder.delete();
+        migrationFolder.delete();
+
+        JenkinsfileGeneratorService.MIGRATION_PATH = "src/main/resources/db/migration";
+        JenkinsfileGeneratorService.JAVA_PATH = "src/main/java";
     }
 
     @Test
@@ -88,6 +91,16 @@ class JenkinsfileGeneratorServiceTest {
     }
 
     @Test
+    void existsDbMigrationScriptsWillReturnTrue() {
+
+        migrationFolder.mkdirs();
+
+        when(project.getBasedir()).thenReturn(new File("."));
+
+        assertTrue(sut.existsDbMigrationScripts(project));
+    }
+
+    @Test
     void hasSourceCode() {
 
         when(project.getBasedir()).thenReturn(new File("."));
@@ -96,7 +109,30 @@ class JenkinsfileGeneratorServiceTest {
     }
 
     @Test
+    void hasSourceCodeWillReturnFalse() {
+
+        JenkinsfileGeneratorService.JAVA_PATH = "fake";
+
+        when(project.getBasedir()).thenReturn(new File("."));
+        when(project.getModules()).thenReturn(Collections.emptyList());
+
+        assertFalse(sut.hasSourceCode(project));
+    }
+
+    @Test
+    void hasSourceCodeWillReturnFalseOnPointer() {
+
+        JenkinsfileGeneratorService.JAVA_PATH = "fake";
+        when(project.getBasedir()).thenReturn(new File("."));
+        when(project.getModules()).thenReturn(Collections.singletonList("../foo"));
+
+        assertFalse(sut.hasSourceCode(project));
+    }
+
+    @Test
     void hasSourceCodeOnSrcModules() {
+
+        JenkinsfileGeneratorService.JAVA_PATH = "foo";
 
         when(project.getModules()).thenReturn(Collections.singletonList("../foo"));
 
@@ -108,6 +144,8 @@ class JenkinsfileGeneratorServiceTest {
     @Test
     void hasSourceCodeOnSrcModulesWillReturnTrue() {
 
+        JenkinsfileGeneratorService.JAVA_PATH = "foo";
+
         when(project.getModules()).thenReturn(Collections.singletonList("foo"));
 
         when(project.getBasedir()).thenReturn(new File("."));
@@ -117,8 +155,6 @@ class JenkinsfileGeneratorServiceTest {
 
     @Test
     void hasSourceCodeOnSrcFolder() {
-
-        sourceFolder.mkdir();
 
         when(project.getBasedir()).thenReturn(new File("."));
 
@@ -153,6 +189,8 @@ class JenkinsfileGeneratorServiceTest {
 
     @Test
     void getSonarExcludesWillReturnOne() {
+
+        JenkinsfileGeneratorService.JAVA_PATH = "fake";
 
         moduleFolder.mkdirs();
 
