@@ -35,6 +35,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     static final String BOOTSTRAP_URL = "@BOOTSTRAP_URL@";
     static final String STEPS = "@STEPS@";
     static final String STAGE = "@STAGE@";
+    static final String SONAR_TOKEN = "@SONAR_TOKEN@";
 
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     MavenProject project;
@@ -266,6 +267,23 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return template.replaceFirst("sonar:sonar", "sonar:sonar" + excludes);
     }
 
+    String fixSonarQualityGateStage(String template) {
+
+        if (!service.hasSourceCode(project)) {
+
+            return null;
+        }
+
+        if (!service.hasSonarProperties(project)) {
+
+            getLog().info("Skip Stage(Sonar Quality Gates) in Jenkinsfile, since there is no sonar properties configured: " + appName);
+
+            return null;
+        }
+
+        return template.replaceFirst(SONAR_TOKEN, maskEnvironmentVariable(project.getProperties().getProperty("sonar.login")));
+    }
+
     String fixupEnvironment(String template) {
 
         StringBuilder environmentsAsString = new StringBuilder();
@@ -488,6 +506,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
             case "sonar":
                 return fixSonarStage(template);
+            case "sonar-quality-gate":
+                return fixSonarQualityGateStage(template);
 
             case "docker-build":
                 return getStageOrNull(template, service.existsDockerfile(project));

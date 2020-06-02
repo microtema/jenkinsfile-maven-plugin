@@ -1,12 +1,17 @@
 stage('Sonar Quality Gate') {
 
+    environment {
+        SONAR_TOKEN = @SONAR_TOKEN@
+    }
+
     steps {
 
         script {
 
             def properties = readProperties file: './target/sonar/report-task.txt'
             def ceTaskUrl = properties.get('ceTaskUrl')
-            def token = readMavenPom().getProperties()['sonar.login']
+            def dashboardUrl = properties.get('dashboardUrl')
+            def token = env.SONAR_TOKEN
             def script = "curl -u ${token}: ${ceTaskUrl}"
 
             def waitForStatus = {
@@ -19,6 +24,7 @@ stage('Sonar Quality Gate') {
                     case 'SUCCESS': return true
                     case 'FAILED':
                         currentBuild.result = 'FAILURE'
+                        echo "Sonar Quality Gate failed. See dashboard: ${dashboardUrl}"
                         throw new Exception("Quality : ${status} not passed!")
                     default: return false
                 }
@@ -29,7 +35,7 @@ stage('Sonar Quality Gate') {
                 sleep(time: 30, unit: 'SECONDS')
             }
 
-            echo 'Sonar Quality Gate passed'
+            echo "Sonar Quality Gate passed. See dashboard: ${dashboardUrl}"
         }
     }
 }
