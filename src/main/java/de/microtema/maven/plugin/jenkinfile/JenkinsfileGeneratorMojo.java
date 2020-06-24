@@ -25,15 +25,15 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     static final String STAGES_TAG = "@STAGES@";
     static final String STAGE_NAME = "@STAGE_NAME@";
-    static final String ENV_STAGE_NAME = "@ENV_STAGE_NAME@";
+    static final String STAGE_DISPLAY_NAME = "@STAGE_DISPLAY_NAME@";
     static final String MAVEN_PROFILE = "@MAVEN_PROFILE@";
+    static final String JOB_NAME = "@JOB_NAME@";
     static final String BRANCH_PATTERN = "@BRANCH_PATTERN@";
     static final String AGENT = "@AGENT@";
     static final String ENVIRONMENT = "@ENVIRONMENT@";
     static final String OPTIONS = "@OPTIONS@";
     static final String TRIGGERS = "@TRIGGERS@";
     static final String BOOTSTRAP_URL = "@BOOTSTRAP_URL@";
-    static final String STEPS = "@STEPS@";
     static final String STAGE = "@STAGE@";
     static final String SONAR_TOKEN = "@SONAR_TOKEN@";
 
@@ -42,6 +42,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     @Parameter(property = "upstream-projects")
     List<String> upstreamProjects = new ArrayList<>();
+
+    @Parameter(property = "downstream-projects")
+    List<String> downstreamProjects = new ArrayList<>();
 
     @Parameter(property = "prod-stages")
     List<String> prodStages = new ArrayList<>();
@@ -137,7 +140,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
          */
         if (stages.isEmpty()) {
             stages.put("etu", "develop,feature-*");
-            stages.put("itu", "release-*,hotfix-*");
+            stages.put("itu", "release-*,hotfix-*,master");
             stages.put("satu", "master");
         }
 
@@ -150,8 +153,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         String test = getTestStageName();
 
         List<String> stageNames = Arrays.asList("initialize", "versioning", "compile", "db-migration", test, "maven-build",
-                "sonar", "security", "sonar-quality-gate", "docker-build", "tag", "publish", "deployment", "readiness", "aqua",
-                "promote", "deployment-prod");
+                "sonar", "security", "sonar-quality-gate", "docker-build", "tag", "publish", "deployment", "readiness",
+                "aqua", "regression-test", "promote", "deployment-prod");
 
         StringBuilder body = new StringBuilder();
 
@@ -330,17 +333,19 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         for (Map.Entry<String, String> stage : stages.entrySet()) {
 
             String stageName = stage.getKey();
-            String branchPatter = getBranches(stage.getValue()).get(0);
 
-            body.append("\n");
+            for (String branchPatter : getBranches(stage.getValue())) {
 
-            String stageTemplate = getJenkinsStage("readiness-stage")
-                    .replaceAll(STAGE_NAME, maskEnvironmentVariable(stageName.toUpperCase()))
-                    .replaceAll(ENV_STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
-                    .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
-            body.append(paddLine(stageTemplate, 8));
+                body.append("\n");
 
-            body.append("\n");
+                String stageTemplate = getJenkinsStage("readiness-stage")
+                        .replaceAll(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, branchPatter))
+                        .replaceAll(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
+                        .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
+                body.append(paddLine(stageTemplate, 8));
+
+                body.append("\n");
+            }
 
         }
 
@@ -365,8 +370,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 body.append("\n");
 
                 String stageTemplate = getJenkinsStage("deployment-stage")
-                        .replaceAll(STAGE_NAME, getStageDisplayName(stageName, branchPatter))
-                        .replaceAll(ENV_STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
+                        .replaceAll(STAGE_NAME, maskEnvironmentVariable(stageName))
+                        .replaceAll(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, branchPatter))
                         .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
                 body.append(paddLine(stageTemplate, 8));
 
@@ -393,17 +398,53 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         for (Map.Entry<String, String> stage : stages.entrySet()) {
 
             String stageName = stage.getKey();
-            String branchPatter = getBranches(stage.getValue()).get(0);
 
-            body.append("\n");
+            for (String branchPatter : getBranches(stage.getValue())) {
 
-            String stageTemplate = getJenkinsStage("db-migration-stage")
-                    .replace(STAGE_NAME, maskEnvironmentVariable(stageName.toUpperCase()))
-                    .replace(MAVEN_PROFILE, maskEnvironmentVariable(stageName.toLowerCase()))
-                    .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
-            body.append(paddLine(stageTemplate, 6));
+                body.append("\n");
 
-            body.append("\n");
+                String stageTemplate = getJenkinsStage("db-migration-stage")
+                        .replace(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, branchPatter))
+                        .replace(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
+                        .replace(MAVEN_PROFILE, maskEnvironmentVariable(stageName.toLowerCase()))
+                        .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
+                body.append(paddLine(stageTemplate, 6));
+
+                body.append("\n");
+            }
+        }
+
+        return template.replace(STAGES_TAG, body.toString());
+    }
+
+    String fixupRegressionTestStage(String template) {
+
+        if (downstreamProjects.isEmpty()) {
+            return null;
+        }
+
+        StringBuilder body = new StringBuilder();
+
+        for (Map.Entry<String, String> stage : stages.entrySet()) {
+
+            String stageName = stage.getKey();
+
+            for (String branchPatter : getBranches(stage.getValue())) {
+
+                for (String downstreamProject : downstreamProjects) {
+
+                    body.append("\n");
+
+                    String stageTemplate = getJenkinsStage("regression-test-stage")
+                            .replace(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, downstreamProject + "/" + branchPatter))
+                            .replace(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
+                            .replace(JOB_NAME, maskEnvironmentVariable(downstreamProject.toLowerCase()))
+                            .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
+                    body.append(paddLine(stageTemplate, 6));
+
+                    body.append("\n");
+                }
+            }
         }
 
         return template.replace(STAGES_TAG, body.toString());
@@ -524,6 +565,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 return fixupDbMigrationStage(template);
             case "readiness":
                 return fixupReadinessStage(template);
+
+            case "regression-test":
+                return fixupRegressionTestStage(template);
             case "aqua":
                 return fixupAquaStage(template);
             case "promote":

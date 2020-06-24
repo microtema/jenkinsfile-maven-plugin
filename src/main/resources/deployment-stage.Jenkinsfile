@@ -1,6 +1,6 @@
-stage(@STAGE_NAME@) {
+stage(@STAGE_DISPLAY_NAME@) {
     environment {
-        STAGE_NAME = @ENV_STAGE_NAME@
+        STAGE_NAME = @STAGE_NAME@
     }
     when {
         branch @BRANCH_PATTERN@

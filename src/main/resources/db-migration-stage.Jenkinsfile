@@ -1,4 +1,4 @@
-stage(@STAGE_NAME@) {
+stage(@STAGE_DISPLAY_NAME@) {
 
     environment {
         MAVEN_PROFILE = @MAVEN_PROFILE@

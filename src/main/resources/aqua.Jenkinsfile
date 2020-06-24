@@ -16,7 +16,7 @@ stage('Aqua Reports') {
 
             def sendToAqua = { file, folderId, testType ->
 
-                def response = sh(script: """
+                def response = sh script: """
                 curl -X POST \
                 -H "X-aprojectid: ${env.AQUA_PROJECT_ID}" \
                 -H "X-afolderid: ${folderId}" \
@@ -27,18 +27,18 @@ stage('Aqua Reports') {
                 -H "X-commit: ${env.GIT_COMMIT}" \
                 --data-binary @${file.path} \
                 "${env.AQUA_URL}"
-                """, returnStdout: true)
+                """, returnStdout: true
 
                 if (response != 'OK') {
                     error "Unable to report ${file.path} test in aqua ${folderId} folder!"
                 }
             }
 
-            def reports = findFiles(glob: "**/*Test.xml")
-            reports.each { sendToAqua(it, env.AQUA_JUNIT_TEST_FOLDER_ID, 'Komponententest') }
+            def reports = findFiles glob: '**/*Test.xml'
+            reports.each { sendToAqua it, env.AQUA_JUNIT_TEST_FOLDER_ID, 'Komponententest' }
 
-            reports = findFiles(glob: "**/*IT.xml")
-            reports.each { sendToAqua(it, env.AQUA_INTEGRATION_TEST_FOLDER_ID, 'Integrationstest') }
+            reports = findFiles glob: '**/*IT.xml'
+            reports.each { sendToAqua it, env.AQUA_INTEGRATION_TEST_FOLDER_ID, 'Integrationstest' }
         }
     }
 }

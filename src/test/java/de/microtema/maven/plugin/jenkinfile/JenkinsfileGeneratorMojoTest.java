@@ -367,7 +367,7 @@ class JenkinsfileGeneratorMojoTest {
         when(service.existsDockerfile(project)).thenReturn(true);
 
         assertEquals("\n" +
-                "        stage('FOO') {\n" +
+                "        stage('FOO (develop)') {\n" +
                 "        \n" +
                 "            environment {\n" +
                 "                STAGE_NAME = 'foo'\n" +
@@ -400,7 +400,7 @@ class JenkinsfileGeneratorMojoTest {
                 "        \n" +
                 "                    while (!waitForPodReadinessImpl.call()) {\n" +
                 "                        echo 'Pod is not available or not ready! Retry after few seconds...'\n" +
-                "                        sleep(time: 30, unit: \"SECONDS\")\n" +
+                "                        sleep time: 30, unit: 'SECONDS'\n" +
                 "                    }\n" +
                 "        \n" +
                 "                    echo 'Pod is ready and updated'\n" +
@@ -410,7 +410,7 @@ class JenkinsfileGeneratorMojoTest {
     }
 
     @Test
-    void fixupDeplymentStageWithStages() {
+    void fixupDeploymentStageWithStages() {
 
         sut.stages.put("dev", "develop");
 
@@ -518,7 +518,7 @@ class JenkinsfileGeneratorMojoTest {
                 "\n" +
                 "    parallel {\n" +
                 "\n" +
-                "      stage('DEV') {\n" +
+                "      stage('DEV (develop)') {\n" +
                 "      \n" +
                 "          environment {\n" +
                 "              MAVEN_PROFILE = 'dev'\n" +

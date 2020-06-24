@@ -1,7 +1,7 @@
-stage(@STAGE_NAME@) {
+stage(@STAGE_DISPLAY_NAME@) {
 
     environment {
-        STAGE_NAME = @ENV_STAGE_NAME@
+        STAGE_NAME = @STAGE_NAME@
     }
 
     when {
@@ -31,7 +31,7 @@ stage(@STAGE_NAME@) {
 
             while (!waitForPodReadinessImpl.call()) {
                 echo 'Pod is not available or not ready! Retry after few seconds...'
-                sleep(time: 30, unit: "SECONDS")
+                sleep time: 30, unit: 'SECONDS'
             }
 
             echo 'Pod is ready and updated'
