@@ -178,7 +178,7 @@ class JenkinsfileGeneratorMojoTest {
         String answer = sut.buildTriggers();
 
         assertEquals("triggers {\n" +
-                "    upstream(upstreamProjects: \"\", threshold: hudson.model.Result.SUCCESS)\n" +
+                "    upstream upstreamProjects: \"\", threshold: hudson.model.Result.SUCCESS\n" +
                 "}\n", answer);
     }
 
@@ -190,7 +190,7 @@ class JenkinsfileGeneratorMojoTest {
         String answer = sut.buildTriggers();
 
         assertEquals("triggers {\n" +
-                "    upstream(upstreamProjects: \"foo/${env.BRANCH_NAME.replaceAll('/', '%2F')}\", threshold: hudson.model.Result.SUCCESS)\n" +
+                "    upstream upstreamProjects: \"foo/${env.BRANCH_NAME.replaceAll('/', '%2F')}\", threshold: hudson.model.Result.SUCCESS\n" +
                 "}\n", answer);
     }
 
@@ -202,7 +202,7 @@ class JenkinsfileGeneratorMojoTest {
         String answer = sut.buildTriggers();
 
         assertEquals("triggers {\n" +
-                "    upstream(upstreamProjects: \"foo/${env.BRANCH_NAME.replaceAll('/', '%2F')},bar/${env.BRANCH_NAME.replaceAll('/', '%2F')}\", threshold: hudson.model.Result.SUCCESS)\n" +
+                "    upstream upstreamProjects: \"foo/${env.BRANCH_NAME.replaceAll('/', '%2F')},bar/${env.BRANCH_NAME.replaceAll('/', '%2F')}\", threshold: hudson.model.Result.SUCCESS\n" +
                 "}\n", answer);
     }
 

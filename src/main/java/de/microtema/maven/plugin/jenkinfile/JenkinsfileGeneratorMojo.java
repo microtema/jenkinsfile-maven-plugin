@@ -86,7 +86,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     LinkedHashMap<String, String> stages = new LinkedHashMap<>();
 
     @Parameter(property = "update")
-    boolean update;
+    boolean update = true;
 
     JenkinsfileGeneratorService service = new JenkinsfileGeneratorService();
 
