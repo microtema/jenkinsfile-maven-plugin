@@ -16,6 +16,7 @@ import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -440,7 +441,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                             .replace(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
                             .replace(JOB_NAME, maskEnvironmentVariable(downstreamProject.toLowerCase()))
                             .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
-                    body.append(paddLine(stageTemplate, 6));
+                    body.append(paddLine(stageTemplate, 8));
 
                     body.append("\n");
                 }
@@ -461,14 +462,54 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             return null;
         }
 
-        return template.replaceFirst("@AQUA_PROJECT_ID@", maskEnvironmentVariable(aquaProjectId))
-                .replaceFirst("@AQUA_URL@", maskEnvironmentVariable(aquaUrl))
-                .replaceFirst("@AQUA_PRODUCT_ID@", maskEnvironmentVariable(aquaProductId))
-                .replaceFirst("@AQUA_RELEASE@", maskEnvironmentVariable(aquaRelease))
-                .replaceFirst("@AQUA_LEVEL@", maskEnvironmentVariable(aquaLevel))
-                .replaceFirst("@AQUA_JUNIT_TEST_FOLDER_ID@", maskEnvironmentVariable(aquaJunitFolderId))
-                .replaceFirst("@AQUA_INTEGRATION_TEST_FOLDER_ID@", maskEnvironmentVariable(aquaITFolderId));
+        StringBuilder stringBuilder = new StringBuilder();
 
+        String stageTemplate = getJenkinsStage("aqua-stage");
+
+        List<Map<String, String>> tests = new ArrayList<>();
+
+        if (StringUtils.isNotEmpty(aquaJunitFolderId)) {
+            Map<String, String> properties = new HashMap<>();
+            properties.put("STAGE_NAME", "Unit Tests");
+            properties.put("AQUA_FILE_FILTER", "**/*Test.xml");
+            properties.put("AQUA_FOLDER_ID", aquaJunitFolderId);
+            properties.put("AQUA_TEST_TYPE", "Komponententest");
+
+            tests.add(properties);
+        }
+
+        if (StringUtils.isNotEmpty(aquaITFolderId)) {
+            Map<String, String> properties = new HashMap<>();
+            properties.put("STAGE_NAME", "Integration Tests");
+            properties.put("AQUA_FILE_FILTER", "**/*IT.xml");
+            properties.put("AQUA_FOLDER_ID", aquaITFolderId);
+            properties.put("AQUA_TEST_TYPE", "Integrationstest");
+
+            tests.add(properties);
+        }
+
+        for (Map<String, String> properties : tests) {
+
+            String stageName = maskEnvironmentVariable(properties.get("STAGE_NAME"));
+
+            stringBuilder.append("\n");
+
+            stringBuilder.append(paddLine(stageTemplate, 8).replace(STAGE_NAME, stageName)
+                    .replace("@AQUA_FILE_FILTER@", maskEnvironmentVariable(properties.get("AQUA_FILE_FILTER")))
+                    .replace("@AQUA_TEST_TYPE@", maskEnvironmentVariable(properties.get("AQUA_TEST_TYPE")))
+                    .replace("@AQUA_FOLDER_ID@", maskEnvironmentVariable(properties.get("AQUA_FOLDER_ID"))));
+
+            stringBuilder.append("\n");
+        }
+
+        return template.replaceFirst("@AQUA_PROJECT_ID@", maskEnvironmentVariable(aquaProjectId))
+                .replace("@AQUA_URL@", maskEnvironmentVariable(aquaUrl))
+                .replace("@AQUA_PRODUCT_ID@", maskEnvironmentVariable(aquaProductId))
+                .replace("@AQUA_RELEASE@", maskEnvironmentVariable(aquaRelease))
+                .replace("@AQUA_LEVEL@", maskEnvironmentVariable(aquaLevel))
+                .replace("@AQUA_JUNIT_TEST_FOLDER_ID@", maskEnvironmentVariable(aquaJunitFolderId))
+                .replace("@AQUA_INTEGRATION_TEST_FOLDER_ID@", maskEnvironmentVariable(aquaITFolderId))
+                .replace(STAGES_TAG, stringBuilder.toString());
     }
 
     String fixupDeploymentProd(String template) {
