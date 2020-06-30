@@ -2,6 +2,7 @@ stage(@STAGE_DISPLAY_NAME@) {
 
     environment {
         STAGE_NAME = @STAGE_NAME@
+        NAMESPACE = "${env.BASE_NAMESPACE}-${env.STAGE_NAME}"
     }
 
     when {
@@ -12,17 +13,16 @@ stage(@STAGE_DISPLAY_NAME@) {
 
         script {
 
-            def namespace = "${env.BASE_NAMESPACE}-${env.STAGE_NAME}"
-
             def waitForPodReadinessImpl = {
 
-                def pods = sh(script: "oc get pods --namespace ${namespace} | grep -E '${env.APP}.*' | grep -v build | grep -v deploy", returnStdout: true)
-                .trim().split('\n')
-                .collect { it.split(' ')[0] }
+                def pods = sh(script: 'oc get pods --namespace $NAMESPACE | grep -v build | grep -v deploy | awk \'/$APP/ {print $1}\'', returnStdout: true).trim().split('\n')
 
                 pods.find {
+
+                    env.POD_NAME = it
+
                     try {
-                        sh(script: "oc describe pod ${it} --namespace ${namespace} | grep -c 'git-commit=${env.GIT_COMMIT}'", returnStdout: true).trim().toInteger()
+                        sh(script: 'oc describe pod $POD_NAME --namespace $NAMESPACE | grep -c \'git-commit=$GIT_COMMIT\'', returnStdout: true).trim().toInteger()
                     } catch (e) {
                         false
                     }
@@ -34,7 +34,7 @@ stage(@STAGE_DISPLAY_NAME@) {
                 sleep time: 30, unit: 'SECONDS'
             }
 
-            echo 'Pod is ready and updated'
+            echo "Pod ${env.POD_NAME} is ready and updated"
         }
     }
 }

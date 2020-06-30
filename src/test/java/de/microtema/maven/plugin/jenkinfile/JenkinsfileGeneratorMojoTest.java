@@ -371,6 +371,7 @@ class JenkinsfileGeneratorMojoTest {
                 "        \n" +
                 "            environment {\n" +
                 "                STAGE_NAME = 'foo'\n" +
+                "                NAMESPACE = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
                 "            }\n" +
                 "        \n" +
                 "            when {\n" +
@@ -381,17 +382,16 @@ class JenkinsfileGeneratorMojoTest {
                 "        \n" +
                 "                script {\n" +
                 "        \n" +
-                "                    def namespace = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
-                "        \n" +
                 "                    def waitForPodReadinessImpl = {\n" +
                 "        \n" +
-                "                        def pods = sh(script: \"oc get pods --namespace ${namespace} | grep -E '${env.APP}.*' | grep -v build | grep -v deploy\", returnStdout: true)\n" +
-                "                        .trim().split('\\n')\n" +
-                "                        .collect { it.split(' ')[0] }\n" +
+                "                        def pods = sh(script: 'oc get pods --namespace $NAMESPACE | grep -v build | grep -v deploy | awk \\'/$APP/ {print $1}\\'', returnStdout: true).trim().split('\\n')\n" +
                 "        \n" +
                 "                        pods.find {\n" +
+                "        \n" +
+                "                            env.POD_NAME = it\n" +
+                "        \n" +
                 "                            try {\n" +
-                "                                sh(script: \"oc describe pod ${it} --namespace ${namespace} | grep -c 'git-commit=${env.GIT_COMMIT}'\", returnStdout: true).trim().toInteger()\n" +
+                "                                sh(script: 'oc describe pod $POD_NAME --namespace $NAMESPACE | grep -c \\'git-commit=$GIT_COMMIT\\'', returnStdout: true).trim().toInteger()\n" +
                 "                            } catch (e) {\n" +
                 "                                false\n" +
                 "                            }\n" +
@@ -403,7 +403,7 @@ class JenkinsfileGeneratorMojoTest {
                 "                        sleep time: 30, unit: 'SECONDS'\n" +
                 "                    }\n" +
                 "        \n" +
-                "                    echo 'Pod is ready and updated'\n" +
+                "                    echo \"Pod ${env.POD_NAME} is ready and updated\"\n" +
                 "                }\n" +
                 "            }\n" +
                 "        }\n", sut.fixupReadinessStage("@STAGES@"));
