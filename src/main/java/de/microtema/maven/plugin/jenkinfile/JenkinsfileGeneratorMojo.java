@@ -25,6 +25,7 @@ import java.util.Map;
 public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     static final String STAGES_TAG = "@STAGES@";
+    static final String FUNCTIONS_TAG = "@FUNCTIONS@";
     static final String STAGE_NAME = "@STAGE_NAME@";
     static final String STAGE_DISPLAY_NAME = "@STAGE_DISPLAY_NAME@";
     static final String MAVEN_PROFILE = "@MAVEN_PROFILE@";
@@ -91,6 +92,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     JenkinsfileGeneratorService service = new JenkinsfileGeneratorService();
 
+    List<String> functionTemplates = new ArrayList<>();
+
     public void execute() {
 
         // Skip maven sub modules
@@ -126,6 +129,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 .replace(OPTIONS, paddLine(options, 4))
                 .replace(TRIGGERS, paddLine(triggers, 4))
                 .replace(STAGES_TAG, paddLine(stagesTemplate, 4))
+                .replace(FUNCTIONS_TAG, getFunctions())
+                .replaceFirst("\\n$", "")
                 .replaceFirst("\\n$", "");
 
         try (PrintWriter out = new PrintWriter(rootPath + "/Jenkinsfile")) {
@@ -155,7 +160,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         List<String> stageNames = Arrays.asList("initialize", "versioning", "compile", "db-migration", test, "maven-build",
                 "sonar", "security", "sonar-quality-gate", "docker-build", "tag", "publish", "deployment", "readiness",
-                "aqua", "regression-test", "promote", "deployment-prod");
+                "aqua", "regression-test", "performance-test", "promote", "deployment-prod");
 
         StringBuilder body = new StringBuilder();
 
@@ -171,6 +176,22 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         }
 
         return body.toString();
+    }
+
+    String getFunctions() {
+
+        if (functionTemplates.isEmpty()) {
+            return StringUtils.EMPTY;
+        }
+
+        StringBuilder template = new StringBuilder();
+
+        for (String function : functionTemplates) {
+            template.append("\n");
+            template.append(function);
+        }
+
+        return template.toString();
     }
 
     String paddLine(String template, int padding) {
@@ -329,6 +350,10 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             return null;
         }
 
+        String functionTemplate = getJenkinsStage("readiness-functions");
+
+        functionTemplates.add(functionTemplate);
+
         StringBuilder body = new StringBuilder();
 
         for (Map.Entry<String, String> stage : stages.entrySet()) {
@@ -418,11 +443,43 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return template.replace(STAGES_TAG, body.toString());
     }
 
+    String fixupPerformanceTestStage(String template) {
+
+        if (!service.existsJmeterFile(project)) {
+            return null;
+        }
+
+        StringBuilder body = new StringBuilder();
+
+        for (Map.Entry<String, String> stage : stages.entrySet()) {
+
+            String stageName = stage.getKey();
+
+            for (String branchPatter : getBranches(stage.getValue())) {
+
+                body.append("\n");
+
+                String stageTemplate = getJenkinsStage("performance-test-stage")
+                        .replace(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, branchPatter))
+                        .replace(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
+                        .replace(MAVEN_PROFILE, maskEnvironmentVariable(stageName.toLowerCase()))
+                        .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
+                body.append(paddLine(stageTemplate, 6));
+
+                body.append("\n");
+            }
+        }
+
+        return template.replace(STAGES_TAG, body.toString());
+    }
+
     String fixupRegressionTestStage(String template) {
 
         if (downstreamProjects.isEmpty()) {
             return null;
         }
+
+        functionTemplates.add(getJenkinsStage("regression-test-function"));
 
         StringBuilder body = new StringBuilder();
 
@@ -461,6 +518,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         if (!service.hasSourceCode(project)) {
             return null;
         }
+
+        functionTemplates.add(getJenkinsStage("aqua-function"));
 
         StringBuilder stringBuilder = new StringBuilder();
 
@@ -609,6 +668,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
             case "regression-test":
                 return fixupRegressionTestStage(template);
+            case "performance-test":
+                return fixupPerformanceTestStage(template);
             case "aqua":
                 return fixupAquaStage(template);
             case "promote":

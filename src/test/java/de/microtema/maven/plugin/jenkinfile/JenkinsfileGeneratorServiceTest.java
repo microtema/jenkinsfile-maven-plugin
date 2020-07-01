@@ -35,6 +35,8 @@ class JenkinsfileGeneratorServiceTest {
 
     File migrationFolder = new File(JenkinsfileGeneratorService.MIGRATION_PATH);
 
+    File jmeterFolder = new File(JenkinsfileGeneratorService.JMETER_PATH);
+
     @AfterEach
     void tearDown() {
 
@@ -42,6 +44,7 @@ class JenkinsfileGeneratorServiceTest {
         jenkinsfile.delete();
         moduleFolder.delete();
         migrationFolder.delete();
+        jmeterFolder.delete();
 
         JenkinsfileGeneratorService.MIGRATION_PATH = "src/main/resources/db/migration";
         JenkinsfileGeneratorService.JAVA_PATH = "src/main/java";
@@ -224,5 +227,23 @@ class JenkinsfileGeneratorServiceTest {
         boolean answer = sut.hasSonarProperties(project);
 
         assertTrue(answer);
+    }
+
+    @Test
+    void existsJmeterFile() {
+
+        when(project.getBasedir()).thenReturn(new File("."));
+
+        assertFalse(sut.existsJmeterFile(project));
+    }
+
+    @Test
+    void existsJmeterFileWillReturnTrue() {
+
+        jmeterFolder.mkdirs();
+
+        when(project.getBasedir()).thenReturn(new File("."));
+
+        assertTrue(sut.existsJmeterFile(project));
     }
 }

@@ -9,6 +9,7 @@ import java.util.List;
 public class JenkinsfileGeneratorService {
 
     static String MIGRATION_PATH = "src/main/resources/db/migration";
+    static String JMETER_PATH = "src/test/jmeter";
     static String JAVA_PATH = "src/main/java";
 
     String getRootPath(MavenProject project) {
@@ -24,6 +25,11 @@ public class JenkinsfileGeneratorService {
     boolean existsDbMigrationScripts(MavenProject project) {
 
         return new File(getRootPath(project), MIGRATION_PATH).exists();
+    }
+
+    boolean existsJmeterFile(MavenProject project) {
+
+        return new File(getRootPath(project), JMETER_PATH).exists();
     }
 
     boolean hasSourceCode(MavenProject project) {

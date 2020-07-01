@@ -2,6 +2,7 @@ package de.microtema.maven.plugin.jenkinfile;
 
 
 import edu.emory.mathcs.backport.java.util.Collections;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.project.MavenProject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,11 +14,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -382,28 +385,7 @@ class JenkinsfileGeneratorMojoTest {
                 "        \n" +
                 "                script {\n" +
                 "        \n" +
-                "                    def waitForPodReadinessImpl = {\n" +
-                "        \n" +
-                "                        def pods = sh(script: 'oc get pods --namespace $NAMESPACE | grep -v build | grep -v deploy | awk \\'/$APP/ {print $1}\\'', returnStdout: true).trim().split('\\n')\n" +
-                "        \n" +
-                "                        pods.find {\n" +
-                "        \n" +
-                "                            env.POD_NAME = it\n" +
-                "        \n" +
-                "                            try {\n" +
-                "                                sh(script: 'oc describe pod $POD_NAME --namespace $NAMESPACE | grep -c \\'git-commit=$GIT_COMMIT\\'', returnStdout: true).trim().toInteger()\n" +
-                "                            } catch (e) {\n" +
-                "                                false\n" +
-                "                            }\n" +
-                "                        }\n" +
-                "                    }\n" +
-                "        \n" +
-                "                    while (!waitForPodReadinessImpl.call()) {\n" +
-                "                        echo 'Pod is not available or not ready! Retry after few seconds...'\n" +
-                "                        sleep time: 30, unit: 'SECONDS'\n" +
-                "                    }\n" +
-                "        \n" +
-                "                    echo \"Pod ${env.POD_NAME} is ready and updated\"\n" +
+                "                    waitForReadiness()\n" +
                 "                }\n" +
                 "            }\n" +
                 "        }\n", sut.fixupReadinessStage("@STAGES@"));
@@ -538,11 +520,49 @@ class JenkinsfileGeneratorMojoTest {
     }
 
     @Test
-    void testFixupAquaStage() {
+    void testFixupAquaStageWithJUnitFolderId() {
 
         when(service.hasSourceCode(project)).thenReturn(true);
 
-        assertEquals("template", sut.fixupAquaStage("template"));
+        sut.aquaJunitFolderId = "123456";
+
+        assertEquals("\n" +
+                "        stage('Unit Tests') {\n" +
+                "            steps {\n" +
+                "                script {\n" +
+                "                    def reports = findFiles glob: '**/*Test.xml'\n" +
+                "                    reports.each { sendToAqua it, '123456', 'Komponententest' }\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n", sut.fixupAquaStage("@STAGES@"));
+    }
+
+    @Test
+    void testFixupAquaStageWithFolderId() {
+
+        when(service.hasSourceCode(project)).thenReturn(true);
+
+        sut.aquaJunitFolderId = "123456";
+        sut.aquaITFolderId = "654321";
+
+        assertEquals("\n" +
+                "        stage('Unit Tests') {\n" +
+                "            steps {\n" +
+                "                script {\n" +
+                "                    def reports = findFiles glob: '**/*Test.xml'\n" +
+                "                    reports.each { sendToAqua it, '123456', 'Komponententest' }\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        stage('Integration Tests') {\n" +
+                "            steps {\n" +
+                "                script {\n" +
+                "                    def reports = findFiles glob: '**/*IT.xml'\n" +
+                "                    reports.each { sendToAqua it, '654321', 'Integrationstest' }\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n", sut.fixupAquaStage("@STAGES@"));
     }
 
     @Test
@@ -607,5 +627,182 @@ class JenkinsfileGeneratorMojoTest {
     void getStageName() {
 
         assertEquals("FOO", sut.getStageName("foo"));
+    }
+
+    @Test
+    void getFunctionsOnEmpty() {
+
+        assertEquals(StringUtils.EMPTY, sut.getFunctions());
+    }
+
+    @Test
+    void getFunctions() {
+
+        sut.functionTemplates.add(sut.getJenkinsStage("aqua-function"));
+
+        assertEquals("\n" +
+                "def sendToAqua(file, folderId, testType) {\n" +
+                "\n" +
+                "    def response = sh script: \"\"\"\n" +
+                "    curl -X POST \\\n" +
+                "    -H \"X-aprojectid: ${env.AQUA_PROJECT_ID}\" \\\n" +
+                "    -H \"X-afolderid: ${folderId}\" \\\n" +
+                "    -H \"X-aprodukt: ${env.AQUA_PRODUCT_ID}\" \\\n" +
+                "    -H \"X-aausbringung: ${env.AQUA_RELEASE}\" \\\n" +
+                "    -H \"X-astufe: ${env.AQUA_LEVEL}\" \\\n" +
+                "    -H \"X-ateststufe: ${testType}\" \\\n" +
+                "    -H \"X-commit: ${env.GIT_COMMIT}\" \\\n" +
+                "    --data-binary @${file.path} \\\n" +
+                "    \"${env.AQUA_URL}\"\n" +
+                "    \"\"\", returnStdout: true\n" +
+                "\n" +
+                "    if (response != 'OK') {\n" +
+                "        error \"Unable to report ${file.path} test in aqua ${folderId} folder!\"\n" +
+                "    }\n" +
+                "}\n", sut.getFunctions());
+    }
+
+    @Test
+    void fixSonarQualityGateStage() {
+
+        when(service.hasSourceCode(any())).thenReturn(false);
+
+        assertNull(sut.fixSonarQualityGateStage(""));
+    }
+
+    @Test
+    void fixSonarQualityGateStageWillReturnFalse() {
+
+        when(service.hasSourceCode(any())).thenReturn(true);
+        when(service.hasSonarProperties(any())).thenReturn(false);
+
+        assertNull(sut.fixSonarQualityGateStage(""));
+    }
+
+    @Test
+    void fixSonarQualityGateStageWillReturnTrue(@Mock MavenProject project, @Mock Properties properties) {
+
+        when(service.hasSourceCode(any())).thenReturn(true);
+        when(service.hasSonarProperties(any())).thenReturn(true);
+        when(project.getProperties()).thenReturn(properties);
+        when(properties.getProperty("sonar.login")).thenReturn("123456789");
+
+        sut.project = project;
+
+        assertEquals("'123456789'", sut.fixSonarQualityGateStage("@SONAR_TOKEN@"));
+    }
+
+    @Test
+    void fixupPerformanceTestStage() {
+
+        when(service.existsJmeterFile(any())).thenReturn(false);
+
+        assertNull(sut.fixupPerformanceTestStage(""));
+    }
+
+    @Test
+    void fixupPerformanceTestStageWillReturnStage() {
+
+        when(service.existsJmeterFile(any())).thenReturn(true);
+
+        sut.stages.put("dev", "develop");
+
+        assertEquals("\n" +
+                "      stage('DEV (develop)') {\n" +
+                "      \n" +
+                "          environment {\n" +
+                "              MAVEN_PROFILE = 'dev'\n" +
+                "          }\n" +
+                "      \n" +
+                "          when {\n" +
+                "              branch 'develop'\n" +
+                "          }\n" +
+                "      \n" +
+                "          steps {\n" +
+                "              sh 'mvn validate -P $MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "          }\n" +
+                "      }\n", sut.fixupPerformanceTestStage("@STAGES@"));
+    }
+
+    @Test
+    void fixupPerformanceTestStageWillReturnMultipleStages() {
+
+        when(service.existsJmeterFile(any())).thenReturn(true);
+
+        sut.stages.put("dev", "develop,feature-*");
+
+        assertEquals("\n" +
+                "      stage('DEV (develop)') {\n" +
+                "      \n" +
+                "          environment {\n" +
+                "              MAVEN_PROFILE = 'dev'\n" +
+                "          }\n" +
+                "      \n" +
+                "          when {\n" +
+                "              branch 'develop'\n" +
+                "          }\n" +
+                "      \n" +
+                "          steps {\n" +
+                "              sh 'mvn validate -P $MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "          }\n" +
+                "      }\n" +
+                "\n" +
+                "      stage('DEV (feature-*)') {\n" +
+                "      \n" +
+                "          environment {\n" +
+                "              MAVEN_PROFILE = 'dev'\n" +
+                "          }\n" +
+                "      \n" +
+                "          when {\n" +
+                "              branch 'feature-*'\n" +
+                "          }\n" +
+                "      \n" +
+                "          steps {\n" +
+                "              sh 'mvn validate -P $MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "          }\n" +
+                "      }\n", sut.fixupPerformanceTestStage("@STAGES@"));
+    }
+
+    @Test
+    void fixupRegressionTestStageOnEmpty() {
+
+        assertNull(sut.fixupRegressionTestStage(""));
+    }
+
+    @Test
+    void fixupRegressionTestStageOnEmptyStages() {
+
+        sut.downstreamProjects.add("e2e");
+
+        assertEquals(StringUtils.EMPTY, sut.fixupRegressionTestStage(""));
+    }
+
+    @Test
+    void fixupRegressionTestStage() {
+
+        sut.downstreamProjects.add("e2e");
+
+        sut.stages.put("dev", "develop");
+
+        assertEquals("\n" +
+                "        stage('DEV (e2e/develop)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                JOB_NAME = 'e2e'\n" +
+                "                STAGE_NAME = 'dev'\n" +
+                "                VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                    triggerJob \"../${env.JOB_NAME}/${env.BRANCH_NAME}\"\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n", sut.fixupRegressionTestStage("@STAGES@"));
     }
 }

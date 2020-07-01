@@ -12,12 +12,8 @@ stage(@STAGE_DISPLAY_NAME@) {
 
     steps {
 
-        build job: "../${env.JOB_NAME}/${env.BRANCH_NAME}",
-              wait: true,
-              parameters: [
-                  string( name: 'git_commit', value: env.COMMIT_ID),
-                  string( name: 'stage_name', value: env.STAGE_NAME),
-                  string( name: 'maven_version', value: env.VERSION)
-              ]
+        script {
+            triggerJob "../${env.JOB_NAME}/${env.BRANCH_NAME}"
+        }
     }
 }
