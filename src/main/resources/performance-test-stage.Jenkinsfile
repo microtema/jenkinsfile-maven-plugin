@@ -11,4 +11,12 @@ stage(@STAGE_DISPLAY_NAME@) {
     steps {
         sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'
     }
+
+    post {
+        always {
+            script {
+                publishJMeterReport()
+            }
+        }
+    }
 }

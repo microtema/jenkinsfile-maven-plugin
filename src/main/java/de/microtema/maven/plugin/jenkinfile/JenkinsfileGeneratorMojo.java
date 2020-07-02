@@ -449,6 +449,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             return null;
         }
 
+        functionTemplates.add(getJenkinsStage("performance-test-function"));
+
         StringBuilder body = new StringBuilder();
 
         for (Map.Entry<String, String> stage : stages.entrySet()) {
@@ -464,7 +466,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                         .replace(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
                         .replace(MAVEN_PROFILE, maskEnvironmentVariable(stageName.toLowerCase()))
                         .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
-                body.append(paddLine(stageTemplate, 6));
+                body.append(paddLine(stageTemplate, 8));
 
                 body.append("\n");
             }
@@ -483,29 +485,49 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         StringBuilder body = new StringBuilder();
 
+        int index = 0;
+        boolean multiple = downstreamProjects.size() > 1;
+
+        for (String downstreamProject : downstreamProjects) {
+
+            String stageDisplayName = "Regression Tests" + (multiple ? " (" + (index + 1) + ")" : "");
+
+            body.append(fixupRegressionTestStageImpl(template, downstreamProject, stageDisplayName));
+
+            if (multiple) {
+                body.append("\n");
+            }
+
+            index++;
+        }
+
+        return body.toString();
+    }
+
+    String fixupRegressionTestStageImpl(String template, String downstreamProject, String stageDisplayName) {
+
+        StringBuilder body = new StringBuilder();
+
         for (Map.Entry<String, String> stage : stages.entrySet()) {
 
             String stageName = stage.getKey();
 
             for (String branchPatter : getBranches(stage.getValue())) {
 
-                for (String downstreamProject : downstreamProjects) {
+                body.append("\n");
 
-                    body.append("\n");
+                String stageTemplate = getJenkinsStage("regression-test-stage")
+                        .replace(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, downstreamProject + "/" + branchPatter))
+                        .replace(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
+                        .replace(JOB_NAME, maskEnvironmentVariable(downstreamProject.toLowerCase()))
+                        .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
+                body.append(paddLine(stageTemplate, 8));
 
-                    String stageTemplate = getJenkinsStage("regression-test-stage")
-                            .replace(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, downstreamProject + "/" + branchPatter))
-                            .replace(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
-                            .replace(JOB_NAME, maskEnvironmentVariable(downstreamProject.toLowerCase()))
-                            .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
-                    body.append(paddLine(stageTemplate, 8));
-
-                    body.append("\n");
-                }
+                body.append("\n");
             }
         }
 
-        return template.replace(STAGES_TAG, body.toString());
+        return template.replace(STAGE_NAME, maskEnvironmentVariable(stageDisplayName)).replace(STAGES_TAG, body.toString());
     }
 
     List<String> getBranches(String branches) {

@@ -708,20 +708,28 @@ class JenkinsfileGeneratorMojoTest {
         sut.stages.put("dev", "develop");
 
         assertEquals("\n" +
-                "      stage('DEV (develop)') {\n" +
-                "      \n" +
-                "          environment {\n" +
-                "              MAVEN_PROFILE = 'dev'\n" +
-                "          }\n" +
-                "      \n" +
-                "          when {\n" +
-                "              branch 'develop'\n" +
-                "          }\n" +
-                "      \n" +
-                "          steps {\n" +
-                "              sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
-                "          }\n" +
-                "      }\n", sut.fixupPerformanceTestStage("@STAGES@"));
+                "        stage('DEV (develop)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                MAVEN_PROFILE = 'dev'\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "                sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "            }\n" +
+                "        \n" +
+                "            post {\n" +
+                "                always {\n" +
+                "                    script {\n" +
+                "                        publishJMeterReport()\n" +
+                "                    }\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n", sut.fixupPerformanceTestStage("@STAGES@"));
     }
 
     @Test
@@ -732,35 +740,51 @@ class JenkinsfileGeneratorMojoTest {
         sut.stages.put("dev", "develop,feature-*");
 
         assertEquals("\n" +
-                "      stage('DEV (develop)') {\n" +
-                "      \n" +
-                "          environment {\n" +
-                "              MAVEN_PROFILE = 'dev'\n" +
-                "          }\n" +
-                "      \n" +
-                "          when {\n" +
-                "              branch 'develop'\n" +
-                "          }\n" +
-                "      \n" +
-                "          steps {\n" +
-                "              sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
-                "          }\n" +
-                "      }\n" +
+                "        stage('DEV (develop)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                MAVEN_PROFILE = 'dev'\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "                sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "            }\n" +
+                "        \n" +
+                "            post {\n" +
+                "                always {\n" +
+                "                    script {\n" +
+                "                        publishJMeterReport()\n" +
+                "                    }\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
                 "\n" +
-                "      stage('DEV (feature-*)') {\n" +
-                "      \n" +
-                "          environment {\n" +
-                "              MAVEN_PROFILE = 'dev'\n" +
-                "          }\n" +
-                "      \n" +
-                "          when {\n" +
-                "              branch 'feature-*'\n" +
-                "          }\n" +
-                "      \n" +
-                "          steps {\n" +
-                "              sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
-                "          }\n" +
-                "      }\n", sut.fixupPerformanceTestStage("@STAGES@"));
+                "        stage('DEV (feature-*)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                MAVEN_PROFILE = 'dev'\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'feature-*'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "                sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "            }\n" +
+                "        \n" +
+                "            post {\n" +
+                "                always {\n" +
+                "                    script {\n" +
+                "                        publishJMeterReport()\n" +
+                "                    }\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n", sut.fixupPerformanceTestStage("@STAGES@"));
     }
 
     @Test
@@ -804,5 +828,70 @@ class JenkinsfileGeneratorMojoTest {
                 "                }\n" +
                 "            }\n" +
                 "        }\n", sut.fixupRegressionTestStage("@STAGES@"));
+    }
+
+
+    @Test
+    void fixupRegressionTestStageMultiple() {
+
+        sut.downstreamProjects.add("e2e");
+        sut.downstreamProjects.add("performance");
+
+        sut.stages.put("dev", "develop");
+
+        assertEquals("stage('Regression Tests (1)') {\n" +
+                "\n" +
+                "    parallel {\n" +
+                "\n" +
+                "        stage('DEV (e2e/develop)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                JOB_NAME = 'e2e'\n" +
+                "                STAGE_NAME = 'dev'\n" +
+                "                VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                    triggerJob \"../${env.JOB_NAME}/${env.BRANCH_NAME}\"\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "    }\n" +
+                "}\n" +
+                "\n" +
+                "stage('Regression Tests (2)') {\n" +
+                "\n" +
+                "    parallel {\n" +
+                "\n" +
+                "        stage('DEV (performance/develop)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                JOB_NAME = 'performance'\n" +
+                "                STAGE_NAME = 'dev'\n" +
+                "                VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                    triggerJob \"../${env.JOB_NAME}/${env.BRANCH_NAME}\"\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "    }\n" +
+                "}\n" +
+                "\n", sut.getJenkinsStage("regression-test"));
     }
 }

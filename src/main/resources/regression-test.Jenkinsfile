@@ -1,4 +1,4 @@
-stage('Regression Tests') {
+stage(@STAGE_NAME@) {
 
     parallel {
 @STAGES@
