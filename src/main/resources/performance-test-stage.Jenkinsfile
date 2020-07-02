@@ -9,6 +9,6 @@ stage(@STAGE_DISPLAY_NAME@) {
     }
 
     steps {
-        sh 'mvn validate -P $MAVEN_PROFILE $MAVEN_ARGS'
+        sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'
     }
 }

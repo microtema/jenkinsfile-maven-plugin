@@ -719,7 +719,7 @@ class JenkinsfileGeneratorMojoTest {
                 "          }\n" +
                 "      \n" +
                 "          steps {\n" +
-                "              sh 'mvn validate -P $MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "              sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
                 "          }\n" +
                 "      }\n", sut.fixupPerformanceTestStage("@STAGES@"));
     }
@@ -743,7 +743,7 @@ class JenkinsfileGeneratorMojoTest {
                 "          }\n" +
                 "      \n" +
                 "          steps {\n" +
-                "              sh 'mvn validate -P $MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "              sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
                 "          }\n" +
                 "      }\n" +
                 "\n" +
@@ -758,7 +758,7 @@ class JenkinsfileGeneratorMojoTest {
                 "          }\n" +
                 "      \n" +
                 "          steps {\n" +
-                "              sh 'mvn validate -P $MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "              sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
                 "          }\n" +
                 "      }\n", sut.fixupPerformanceTestStage("@STAGES@"));
     }
