@@ -612,7 +612,7 @@ class JenkinsfileGeneratorMojoTest {
         String answer = sut.getJenkinsStage("agent");
 
         assertEquals("agent {\n" +
-                "    label 'mvn8'\n" +
+                "    label 'jdk8'\n" +
                 "}\n", answer);
     }
 

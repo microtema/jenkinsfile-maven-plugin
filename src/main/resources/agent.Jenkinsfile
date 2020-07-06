@@ -1,3 +1,3 @@
 agent {
-    label 'mvn8'
+    label 'jdk8'
 }
