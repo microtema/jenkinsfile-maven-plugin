@@ -622,11 +622,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         String[] tokens = stage.split("-");
 
-        if (tokens.length == 1) {
-            return stage.toUpperCase();
-        }
-
-        return tokens[1].toUpperCase();
+        return tokens[tokens.length - 1].toUpperCase();
     }
 
     String getStageOrNull(String template, boolean render) {
