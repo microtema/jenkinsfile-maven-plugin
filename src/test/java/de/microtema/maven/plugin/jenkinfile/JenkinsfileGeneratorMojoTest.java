@@ -377,15 +377,19 @@ class JenkinsfileGeneratorMojoTest {
                 "                NAMESPACE = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
                 "            }\n" +
                 "        \n" +
+                "            options {\n" +
+                "                timeout(time: 3, unit: 'MINUTES')\n" +
+                "            }\n" +
+                "        \n" +
                 "            when {\n" +
                 "                branch 'develop'\n" +
                 "            }\n" +
                 "        \n" +
                 "            steps {\n" +
-                "        \n" +
-                "                script {\n" +
-                "        \n" +
-                "                    waitForReadiness()\n" +
+                "                catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {\n" +
+                "                    script {\n" +
+                "                        waitForReadiness()\n" +
+                "                    }\n" +
                 "                }\n" +
                 "            }\n" +
                 "        }\n", sut.fixupReadinessStage("@STAGES@"));
@@ -411,7 +415,10 @@ class JenkinsfileGeneratorMojoTest {
                 "                STAGE_NAME = 'dev'\n" +
                 "            }\n" +
                 "            when {\n" +
-                "                branch 'develop'\n" +
+                "                allOf {\n" +
+                "                    branch 'develop'\n" +
+                "                    environment name: 'DEPLOYABLE', value: 'true'\n" +
+                "                }\n" +
                 "            }\n" +
                 "            steps {\n" +
                 "                withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {\n" +
@@ -446,7 +453,10 @@ class JenkinsfileGeneratorMojoTest {
                 "                STAGE_NAME = 'qa'\n" +
                 "            }\n" +
                 "            when {\n" +
-                "                branch 'release-*'\n" +
+                "                allOf {\n" +
+                "                    branch 'release-*'\n" +
+                "                    environment name: 'DEPLOYABLE', value: 'true'\n" +
+                "                }\n" +
                 "            }\n" +
                 "            steps {\n" +
                 "                withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {\n" +
@@ -462,7 +472,10 @@ class JenkinsfileGeneratorMojoTest {
                 "                STAGE_NAME = 'qa'\n" +
                 "            }\n" +
                 "            when {\n" +
-                "                branch 'hotfix-*'\n" +
+                "                allOf {\n" +
+                "                    branch 'hotfix-*'\n" +
+                "                    environment name: 'DEPLOYABLE', value: 'true'\n" +
+                "                }\n" +
                 "            }\n" +
                 "            steps {\n" +
                 "                withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {\n" +

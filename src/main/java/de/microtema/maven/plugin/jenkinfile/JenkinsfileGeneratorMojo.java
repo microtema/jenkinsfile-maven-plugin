@@ -306,6 +306,10 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             return null;
         }
 
+        String functionTemplate = getJenkinsStage("sonar-quality-gate-function");
+
+        functionTemplates.add(functionTemplate);
+
         return template.replaceFirst(SONAR_TOKEN, maskEnvironmentVariable(project.getProperties().getProperty("sonar.login")));
     }
 

@@ -20,15 +20,15 @@ stage('Versioning') {
 
         script {
 
-            if(env.BRANCH_NAME != 'master') {
-
-                sh 'mvn release:update-versions -DdevelopmentVersion=2.1.0-SNAPSHOT $MAVEN_ARGS'
-                sh 'mvn versions:set -DnewVersion=$VERSION-$CURRENT_TIME-$BUILD_NUMBER $MAVEN_ARGS'
-
-            } else if(env.BRANCH_NAME.contains('SNAPSHOT')) {
+            if(env.BRANCH_NAME == 'master') {
 
                 sh 'mvn release:update-versions -DdevelopmentVersion=$BRANCH_NAME $MAVEN_ARGS'
-                sh "mvn versions:set -DnewVersion=${env.BRANCH_NAME.replaceAll('-SNAPSHOT','')} ${env.MAVEN_ARGS}"
+                sh "mvn versions:set -DnewVersion=${env.VERSION.replaceAll('-SNAPSHOT','')} ${env.MAVEN_ARGS}"
+
+            } else {
+
+                sh 'mvn release:update-versions -DdevelopmentVersion=2.1.0-SNAPSHOT $MAVEN_ARGS'
+                sh "mvn versions:set -DnewVersion=${env.VERSION.replaceAll('-SNAPSHOT','')}-${env.CURRENT_TIME}-${env.BUILD_NUMBER} ${env.MAVEN_ARGS}"
             }
         }
     }
