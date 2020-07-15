@@ -10,7 +10,7 @@ stage('Promote to PROD?') {
     steps {
         script {
             try {
-                timeout(time: 1, unit: 'HOURS') {
+                timeout(time: @TIMEOUT@, unit: 'MINUTES') {
                     input id: 'promote-prod', message: 'Promote release to Prod?'
                 }
             } catch (e) {

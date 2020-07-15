@@ -38,6 +38,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     static final String BOOTSTRAP_URL = "@BOOTSTRAP_URL@";
     static final String STAGE = "@STAGE@";
     static final String SONAR_TOKEN = "@SONAR_TOKEN@";
+    static final String TIMEOUT_TAG = "@TIMEOUT@";
 
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     MavenProject project;
@@ -90,6 +91,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "update")
     boolean update = true;
 
+    @Parameter(property = "timeout")
+    int timeout = 60; // in minutes
+
     JenkinsfileGeneratorService service = new JenkinsfileGeneratorService();
 
     List<String> functionTemplates = new ArrayList<>();
@@ -119,7 +123,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         String agent = getJenkinsStage("agent");
         String environment = getJenkinsStage("environment");
-        String options = getJenkinsStage("options");
+        String options = getJenkinsStage("options").replace(TIMEOUT_TAG, String.valueOf(timeout));
         String triggers = buildTriggers();
         String stagesTemplate = buildStages();
         String pipeline = getJenkinsStage("pipeline");
@@ -597,6 +601,15 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 .replace(STAGES_TAG, stringBuilder.toString());
     }
 
+    private String fixupPromoteStage(String template) {
+
+        if (prodStages.isEmpty() || !service.existsDockerfile(project)) {
+            return null;
+        }
+
+        return template.replace(TIMEOUT_TAG, String.valueOf(timeout / 2));
+    }
+
     String fixupDeploymentProd(String template) {
 
         if (prodStages.isEmpty() || !service.existsDockerfile(project)) {
@@ -695,7 +708,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             case "aqua":
                 return fixupAquaStage(template);
             case "promote":
-                return getStageOrNull(template, !prodStages.isEmpty() && service.existsDockerfile(project));
+                return fixupPromoteStage(template);
             case "deployment-prod":
                 return fixupDeploymentProd(template);
             default:
