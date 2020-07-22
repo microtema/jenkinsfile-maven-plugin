@@ -6,7 +6,7 @@ stage(@STAGE_DISPLAY_NAME@) {
     }
 
     options {
-        timeout(time: 3, unit: 'MINUTES')
+        timeout(time: 10, unit: 'MINUTES')
     }
 
     when {
@@ -14,10 +14,23 @@ stage(@STAGE_DISPLAY_NAME@) {
     }
 
     steps {
-        catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {
-            script {
-                waitForReadiness()
-            }
+
+        script {
+             Throwable caughtException = null
+
+             try {
+                 catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {
+                     waitForReadiness()
+                 }
+             } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+                 error "Caught ${e.toString()}"
+             } catch (Throwable e) {
+                 caughtException = e
+             }
+
+             if (caughtException) {
+                 error caughtException.message
+             }
         }
     }
 }

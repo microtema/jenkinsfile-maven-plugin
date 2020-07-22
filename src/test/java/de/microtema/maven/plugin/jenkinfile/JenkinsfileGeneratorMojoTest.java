@@ -378,7 +378,7 @@ class JenkinsfileGeneratorMojoTest {
                 "            }\n" +
                 "        \n" +
                 "            options {\n" +
-                "                timeout(time: 3, unit: 'MINUTES')\n" +
+                "                timeout(time: 10, unit: 'MINUTES')\n" +
                 "            }\n" +
                 "        \n" +
                 "            when {\n" +
@@ -386,10 +386,23 @@ class JenkinsfileGeneratorMojoTest {
                 "            }\n" +
                 "        \n" +
                 "            steps {\n" +
-                "                catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {\n" +
-                "                    script {\n" +
-                "                        waitForReadiness()\n" +
-                "                    }\n" +
+                "        \n" +
+                "                script {\n" +
+                "                     Throwable caughtException = null\n" +
+                "        \n" +
+                "                     try {\n" +
+                "                         catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {\n" +
+                "                             waitForReadiness()\n" +
+                "                         }\n" +
+                "                     } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {\n" +
+                "                         error \"Caught ${e.toString()}\"\n" +
+                "                     } catch (Throwable e) {\n" +
+                "                         caughtException = e\n" +
+                "                     }\n" +
+                "        \n" +
+                "                     if (caughtException) {\n" +
+                "                         error caughtException.message\n" +
+                "                     }\n" +
                 "                }\n" +
                 "            }\n" +
                 "        }\n", sut.fixupReadinessStage("@STAGES@"));

@@ -5,14 +5,27 @@ stage('Sonar Quality Gate') {
     }
 
     options {
-        timeout(time: 3, unit: 'MINUTES')
+        timeout(time: 10, unit: 'MINUTES')
     }
 
     steps {
-        catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {
-            script {
-                checkSonarQualityGate()
-            }
+
+        script {
+             Throwable caughtException = null
+
+             try {
+                 catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {
+                     checkSonarQualityGate()
+                 }
+             } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+                 error "Caught ${e.toString()}"
+             } catch (Throwable e) {
+                 caughtException = e
+             }
+
+             if (caughtException) {
+                 error caughtException.message
+             }
         }
     }
 }
