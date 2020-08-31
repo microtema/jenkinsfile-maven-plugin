@@ -162,9 +162,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         String test = getTestStageName();
 
-        List<String> stageNames = Arrays.asList("initialize", "versioning", "compile", "db-migration", test, "maven-build",
-                "sonar", "security", "sonar-quality-gate", "docker-build", "tag", "publish", "deployment", "readiness",
-                "aqua", "regression-test", "performance-test", "promote", "deployment-prod");
+        List<String> stageNames = Arrays.asList("initialize", "versioning", "compile", test, "maven-build",
+                "sonar", "security", /* "sonar-quality-gate",*/"db-migration", "docker-build", "tag", "publish", "deployment", /*"readiness",*/
+                "aqua", /* "regression-test", "performance-test",*/ "promote", "deployment-prod");
 
         StringBuilder body = new StringBuilder();
 
@@ -406,6 +406,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 String stageTemplate = getJenkinsStage("deployment-stage")
                         .replaceAll(STAGE_NAME, maskEnvironmentVariable(stageName))
                         .replaceAll(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, branchPatter))
+                        .replace("@DEPLOY_FUNCTION@", getDeployFunction(branchPatter))
                         .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
                 body.append(paddLine(stageTemplate, 8));
 
@@ -414,6 +415,15 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         }
 
         return template.replace(STAGES_TAG, body.toString());
+    }
+
+    private String getDeployFunction(String branchPatter) {
+
+        if (branchPatter.equalsIgnoreCase("feature-*")) {
+            return "createBranchIfNotExistsAndCommitChanges()";
+        }
+
+        return "createAndMergeOpsRepoMergeRequest()";
     }
 
     String getStageDisplayName(String stageName, String branchPatter) {
@@ -692,6 +702,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                 return fixupDeploymentStage(template);
 
             case "versioning":
+                return fixupVersioningStage(template);
+
             case "publish":
             case "tag":
                 return getStageOrNull(template, !service.existsDockerfile(project));
@@ -714,6 +726,17 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             default:
                 return template;
         }
+    }
+
+    private String fixupVersioningStage(String template) {
+
+        if (service.existsDockerfile(project)) {
+            return null;
+        }
+
+        functionTemplates.add(getJenkinsStage("versioning-function"));
+
+        return template;
     }
 
     void logMessage(String message) {

@@ -426,10 +426,11 @@ class JenkinsfileGeneratorMojoTest {
                 "        stage('DEV (develop)') {\n" +
                 "            environment {\n" +
                 "                STAGE_NAME = 'dev'\n" +
+                "                BRANCH_PATTERN = 'develop'\n" +
                 "            }\n" +
                 "            when {\n" +
                 "                allOf {\n" +
-                "                    branch 'develop'\n" +
+                "                    branch env.BRANCH_PATTERN\n" +
                 "                    environment name: 'DEPLOYABLE', value: 'true'\n" +
                 "                }\n" +
                 "            }\n" +
@@ -464,10 +465,11 @@ class JenkinsfileGeneratorMojoTest {
                 "        stage('QA (release-*)') {\n" +
                 "            environment {\n" +
                 "                STAGE_NAME = 'qa'\n" +
+                "                BRANCH_PATTERN = 'release-*'\n" +
                 "            }\n" +
                 "            when {\n" +
                 "                allOf {\n" +
-                "                    branch 'release-*'\n" +
+                "                    branch env.BRANCH_PATTERN\n" +
                 "                    environment name: 'DEPLOYABLE', value: 'true'\n" +
                 "                }\n" +
                 "            }\n" +
@@ -483,10 +485,11 @@ class JenkinsfileGeneratorMojoTest {
                 "        stage('QA (hotfix-*)') {\n" +
                 "            environment {\n" +
                 "                STAGE_NAME = 'qa'\n" +
+                "                BRANCH_PATTERN = 'hotfix-*'\n" +
                 "            }\n" +
                 "            when {\n" +
                 "                allOf {\n" +
-                "                    branch 'hotfix-*'\n" +
+                "                    branch env.BRANCH_PATTERN\n" +
                 "                    environment name: 'DEPLOYABLE', value: 'true'\n" +
                 "                }\n" +
                 "            }\n" +
