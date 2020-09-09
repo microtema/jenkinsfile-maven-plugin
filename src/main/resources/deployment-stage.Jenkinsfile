@@ -1,13 +1,9 @@
 stage(@STAGE_DISPLAY_NAME@) {
     environment {
         STAGE_NAME = @STAGE_NAME@
-        BRANCH_PATTERN = @BRANCH_PATTERN@
     }
     when {
-        allOf {
-            branch env.BRANCH_PATTERN
-            environment name: 'DEPLOYABLE', value: 'true'
-        }
+        branch @BRANCH_PATTERN@
     }
     steps {
         withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {

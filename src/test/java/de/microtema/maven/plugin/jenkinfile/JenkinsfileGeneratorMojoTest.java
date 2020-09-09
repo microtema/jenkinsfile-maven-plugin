@@ -426,13 +426,9 @@ class JenkinsfileGeneratorMojoTest {
                 "        stage('DEV (develop)') {\n" +
                 "            environment {\n" +
                 "                STAGE_NAME = 'dev'\n" +
-                "                BRANCH_PATTERN = 'develop'\n" +
                 "            }\n" +
                 "            when {\n" +
-                "                allOf {\n" +
-                "                    branch env.BRANCH_PATTERN\n" +
-                "                    environment name: 'DEPLOYABLE', value: 'true'\n" +
-                "                }\n" +
+                "                branch 'develop'\n" +
                 "            }\n" +
                 "            steps {\n" +
                 "                withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {\n" +
@@ -448,7 +444,7 @@ class JenkinsfileGeneratorMojoTest {
     }
 
     @Test
-    void fixupDeplymentStageWithMultipleStages() {
+    void fixupDeploymentStageWithMultipleStages() {
 
         sut.stages.put("qa", "release-*,hotfix-*");
 
@@ -465,13 +461,9 @@ class JenkinsfileGeneratorMojoTest {
                 "        stage('QA (release-*)') {\n" +
                 "            environment {\n" +
                 "                STAGE_NAME = 'qa'\n" +
-                "                BRANCH_PATTERN = 'release-*'\n" +
                 "            }\n" +
                 "            when {\n" +
-                "                allOf {\n" +
-                "                    branch env.BRANCH_PATTERN\n" +
-                "                    environment name: 'DEPLOYABLE', value: 'true'\n" +
-                "                }\n" +
+                "                branch 'release-*'\n" +
                 "            }\n" +
                 "            steps {\n" +
                 "                withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {\n" +
@@ -485,13 +477,9 @@ class JenkinsfileGeneratorMojoTest {
                 "        stage('QA (hotfix-*)') {\n" +
                 "            environment {\n" +
                 "                STAGE_NAME = 'qa'\n" +
-                "                BRANCH_PATTERN = 'hotfix-*'\n" +
                 "            }\n" +
                 "            when {\n" +
-                "                allOf {\n" +
-                "                    branch env.BRANCH_PATTERN\n" +
-                "                    environment name: 'DEPLOYABLE', value: 'true'\n" +
-                "                }\n" +
+                "                branch 'hotfix-*'\n" +
                 "            }\n" +
                 "            steps {\n" +
                 "                withCredentials([usernamePassword(credentialsId: 'SCM_CREDENTIALS', usernameVariable: 'SCM_USERNAME', passwordVariable: 'SCM_PASSWORD')]) {\n" +
