@@ -94,6 +94,18 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "timeout")
     int timeout = 60; // in minutes
 
+    @Parameter(property = "sonar")
+    boolean sonar = true;
+
+    @Parameter(property = "sonar-quality-gate")
+    boolean sonarQualityGate = true;
+
+    @Parameter(property = "readiness")
+    boolean readiness = true;
+
+    @Parameter(property = "performance-test")
+    boolean performanceTest = true;
+
     JenkinsfileGeneratorService service = new JenkinsfileGeneratorService();
 
     List<String> functionTemplates = new ArrayList<>();
@@ -162,9 +174,33 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
         String test = getTestStageName();
 
-        List<String> stageNames = Arrays.asList("initialize", "versioning", "compile", test, "maven-build",
-                "sonar", "security", /* "sonar-quality-gate",*/"db-migration", "docker-build", "tag", "publish", "deployment", /*"readiness",*/
-                "aqua", /* "regression-test", "performance-test",*/ "promote", "deployment-prod");
+        List<String> stageNames = new ArrayList<>(Arrays.asList("initialize", "versioning", "compile", test, "maven-build"));
+
+        if (sonar) {
+            stageNames.add("sonar");
+        }
+
+        stageNames.add("security");
+
+        if (sonarQualityGate && sonar) {
+            stageNames.add("sonar-quality-gate");
+        }
+
+        stageNames.addAll(Arrays.asList("db-migration", "docker-build", "tag", "publish", "deployment"));
+
+        stageNames.add("aqua");
+
+        if (readiness) {
+            stageNames.add("readiness");
+        }
+
+        stageNames.add("regression-test");
+
+        if (performanceTest) {
+            stageNames.add("performance-test");
+        }
+
+        stageNames.addAll(Arrays.asList("promote", "deployment-prod"));
 
         StringBuilder body = new StringBuilder();
 
