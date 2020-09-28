@@ -1,25 +1,47 @@
-def waitForReadiness() {
+def waitForReadiness(url, closure) {
 
-    def podName
-    def waitForPodReadinessImpl = {
+    if(url) {
 
-        def pods = sh(script: "oc get pods --namespace ${env.NAMESPACE} | grep -v build | grep -v deploy | awk '/${env.APP}/ {print \$1}'", returnStdout: true)
-        .trim().split('\n').findAll { it }
-
-        pods.find {
-            podName = it
+        def waitForReadinessImpl = {
             try {
-                sh(script: "oc describe pod ${podName} --namespace ${env.NAMESPACE} | grep -c 'git-commit=${env.GIT_COMMIT}'", returnStdout: true).trim().toInteger()
+                def response = httpRequest url
+                def json = new groovy.json.JsonSlurper().parseText(response.content)
+                closure.call(json)
             } catch (e) {
                 false
             }
         }
-    }
 
-    while (!waitForPodReadinessImpl.call()) {
-        echo 'Pod is not available or not ready! Retry after few seconds...'
-        sleep time: 30, unit: 'SECONDS'
-    }
+        while (!waitForReadinessImpl.call()) {
+            echo 'Application is not available or not ready! Retry after few seconds...'
+            sleep(time: 30, unit: "SECONDS")
+        }
 
-    echo "Pod ${podName} is ready and updated"
+        echo 'Application is ready and updated'
+
+    } else {
+
+        def podName
+        def waitForPodReadinessImpl = {
+
+            def pods = sh(script: "oc get pods --namespace ${env.NAMESPACE} | grep -v build | grep -v deploy | awk '/${env.APP}/ {print \$1}'", returnStdout: true)
+            .trim().split('\n').findAll { it }
+
+            pods.find {
+                podName = it
+                try {
+                    sh(script: "oc describe pod ${podName} --namespace ${env.NAMESPACE} | grep -c 'git-commit=${env.GIT_COMMIT}'", returnStdout: true).trim().toInteger()
+                } catch (e) {
+                    false
+                }
+            }
+        }
+
+        while (!waitForPodReadinessImpl.call()) {
+            echo 'Pod is not available or not ready! Retry after few seconds...'
+            sleep time: 30, unit: 'SECONDS'
+        }
+
+        echo "Pod ${podName} is ready and updated"
+    }
 }

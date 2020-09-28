@@ -27,6 +27,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     static final String STAGES_TAG = "@STAGES@";
     static final String FUNCTIONS_TAG = "@FUNCTIONS@";
     static final String STAGE_NAME = "@STAGE_NAME@";
+    static final String ENDPOINT = "@ENDPOINT@";
     static final String STAGE_DISPLAY_NAME = "@STAGE_DISPLAY_NAME@";
     static final String MAVEN_PROFILE = "@MAVEN_PROFILE@";
     static final String JOB_NAME = "@JOB_NAME@";
@@ -103,6 +104,12 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "readiness")
     boolean readiness = true;
 
+    @Parameter(property = "readiness-endpoint")
+    String readinessEndpoint;
+
+    @Parameter(property = "readiness-closure", defaultValue = "{ it.commitId == env.GIT_COMMIT }")
+    String readinessClosure = "{ it.commitId == env.GIT_COMMIT }";
+
     @Parameter(property = "performance-test")
     boolean performanceTest = true;
 
@@ -164,6 +171,12 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             stages.put("etu", "develop,feature-*");
             stages.put("itu", "release-*,hotfix-*,master");
             stages.put("satu", "master");
+        }
+
+        if (StringUtils.isNoneEmpty(readinessEndpoint)) {
+            if (!readinessEndpoint.startsWith("http")) {
+                readinessEndpoint = "http://$APP.$BASE_NAMESPACE-$STAGE_NAME.svc.cluster.local" + (readinessEndpoint.startsWith("/") ? "" : "/") + readinessEndpoint;
+            }
         }
 
         // Prevent recursive upstreams
@@ -408,9 +421,15 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
                 body.append("\n");
 
+                String endpoint = StringUtils.trimToEmpty(readinessEndpoint).replace("$STAGE_NAME", stageName.toLowerCase())
+                        .replace("$BASE_NAMESPACE", baseNamespace)
+                        .replace("$APP", appName);
+
                 String stageTemplate = getJenkinsStage("readiness-stage")
                         .replaceAll(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, branchPatter))
                         .replaceAll(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
+                        .replaceAll(ENDPOINT, maskEnvironmentVariable(endpoint))
+                        .replaceAll("@CLOSURE@", readinessClosure)
                         .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
                 body.append(paddLine(stageTemplate, 8));
 

@@ -392,7 +392,7 @@ class JenkinsfileGeneratorMojoTest {
                 "        \n" +
                 "                     try {\n" +
                 "                         catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {\n" +
-                "                             waitForReadiness()\n" +
+                "                             waitForReadiness('', { it.commitId == env.GIT_COMMIT })\n" +
                 "                         }\n" +
                 "                     } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {\n" +
                 "                         error \"Caught ${e.toString()}\"\n" +

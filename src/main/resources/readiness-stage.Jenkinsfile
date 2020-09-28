@@ -20,7 +20,7 @@ stage(@STAGE_DISPLAY_NAME@) {
 
              try {
                  catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {
-                     waitForReadiness()
+                     waitForReadiness(@ENDPOINT@, @CLOSURE@)
                  }
              } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
                  error "Caught ${e.toString()}"
