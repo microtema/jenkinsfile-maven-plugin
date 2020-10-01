@@ -107,7 +107,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "readiness-endpoint")
     String readinessEndpoint;
 
-    @Parameter(property = "readiness-closure", defaultValue = "{ it.commitId == env.GIT_COMMIT }")
+    @Parameter(property = "readiness-closure")
     String readinessClosure = "{ it.commitId == env.GIT_COMMIT }";
 
     @Parameter(property = "performance-test")

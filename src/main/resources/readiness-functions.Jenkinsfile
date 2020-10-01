@@ -5,6 +5,7 @@ def waitForReadiness(url, closure) {
         def waitForReadinessImpl = {
             try {
                 def response = httpRequest url
+                echo "@Get ${url} -> ${response.content}"
                 def json = new groovy.json.JsonSlurper().parseText(response.content)
                 closure.call(json)
             } catch (e) {
