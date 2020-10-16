@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Mojo(name = "generate", defaultPhase = LifecyclePhase.COMPILE)
 public class JenkinsfileGeneratorMojo extends AbstractMojo {
@@ -89,6 +90,9 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     @Parameter(property = "stages")
     LinkedHashMap<String, String> stages = new LinkedHashMap<>();
 
+    @Parameter(property = "clusters")
+    LinkedHashMap<String, String> clusters = new LinkedHashMap<>();
+
     @Parameter(property = "update")
     boolean update = true;
 
@@ -108,7 +112,7 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     String readinessEndpoint;
 
     @Parameter(property = "readiness-closure")
-    String readinessClosure = "{ it.commitId == env.GIT_COMMIT }";
+    String readinessClosure;
 
     @Parameter(property = "performance-test")
     boolean performanceTest = true;
@@ -173,9 +177,19 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
             stages.put("satu", "master");
         }
 
+        if (clusters.isEmpty()) {
+            clusters.put("etu", "test-ekad-caas1.rz.bankenit.de");
+            clusters.put("itu", "test-ekad-caas1.rz.bankenit.de");
+            clusters.put("satu", "satu-ekad-caas1.rz.bankenit.de");
+        }
+
+        if (readiness && StringUtils.isEmpty(readinessClosure)) {
+            readinessEndpoint = Optional.ofNullable(readinessEndpoint).orElse("/" + appName + "/actuator/info/git");
+        }
+
         if (StringUtils.isNoneEmpty(readinessEndpoint)) {
             if (!readinessEndpoint.startsWith("http")) {
-                readinessEndpoint = "http://$APP.$BASE_NAMESPACE-$STAGE_NAME.svc.cluster.local" + (readinessEndpoint.startsWith("/") ? "" : "/") + readinessEndpoint;
+                readinessEndpoint = "https://$BASE_NAMESPACE-$STAGE_NAME.$CLUSTER_URL" + (readinessEndpoint.startsWith("/") ? "" : "/") + readinessEndpoint;
             }
         }
 
@@ -416,20 +430,22 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         for (Map.Entry<String, String> stage : stages.entrySet()) {
 
             String stageName = stage.getKey();
+            String clusterUrl = clusters.getOrDefault(stageName, stageName + ".de");
 
             for (String branchPatter : getBranches(stage.getValue())) {
 
                 body.append("\n");
 
-                String endpoint = StringUtils.trimToEmpty(readinessEndpoint).replace("$STAGE_NAME", stageName.toLowerCase())
+                String endpoint = StringUtils.trimToEmpty(readinessEndpoint)
                         .replace("$BASE_NAMESPACE", baseNamespace)
-                        .replace("$APP", appName);
+                        .replace("$STAGE_NAME", stageName.toLowerCase())
+                        .replace("$CLUSTER_URL", clusterUrl);
 
                 String stageTemplate = getJenkinsStage("readiness-stage")
                         .replaceAll(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, branchPatter))
                         .replaceAll(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
                         .replaceAll(ENDPOINT, maskEnvironmentVariable(endpoint))
-                        .replaceAll("@CLOSURE@", readinessClosure)
+                        .replaceAll("@CLOSURE@", Optional.ofNullable(readinessClosure).orElse("{ it.commitId == env.GIT_COMMIT }"))
                         .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
                 body.append(paddLine(stageTemplate, 8));
 

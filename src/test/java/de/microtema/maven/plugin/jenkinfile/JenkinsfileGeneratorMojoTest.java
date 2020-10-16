@@ -156,6 +156,16 @@ class JenkinsfileGeneratorMojoTest {
     }
 
     @Test
+    void initDefaultsWillBeIgnoredOnCluster() {
+
+        sut.clusters.put("foo", "bar");
+
+        sut.initDefaults();
+
+        assertEquals(1, sut.clusters.size());
+    }
+
+    @Test
     void paddLine() {
 
         assertEquals("    stage('name') {}", sut.paddLine("stage('name') {}", 4));
