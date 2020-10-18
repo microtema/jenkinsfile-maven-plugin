@@ -779,7 +779,9 @@ class JenkinsfileGeneratorMojoTest {
                 "            }\n" +
                 "        \n" +
                 "            steps {\n" +
-                "                sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {\n" +
+                "                    sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "                }\n" +
                 "            }\n" +
                 "        \n" +
                 "            post {\n" +
@@ -811,7 +813,9 @@ class JenkinsfileGeneratorMojoTest {
                 "            }\n" +
                 "        \n" +
                 "            steps {\n" +
-                "                sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {\n" +
+                "                    sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "                }\n" +
                 "            }\n" +
                 "        \n" +
                 "            post {\n" +
@@ -834,7 +838,9 @@ class JenkinsfileGeneratorMojoTest {
                 "            }\n" +
                 "        \n" +
                 "            steps {\n" +
-                "                sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {\n" +
+                "                    sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'\n" +
+                "                }\n" +
                 "            }\n" +
                 "        \n" +
                 "            post {\n" +

@@ -9,7 +9,9 @@ stage(@STAGE_DISPLAY_NAME@) {
     }
 
     steps {
-        sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'
+        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+            sh 'mvn validate -P performance-$MAVEN_PROFILE $MAVEN_ARGS'
+        }
     }
 
     post {
