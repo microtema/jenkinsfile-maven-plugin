@@ -373,7 +373,7 @@ class JenkinsfileGeneratorMojoTest {
     }
 
     @Test
-    void fixupReadinessStageWithStages() {
+    void fixupReadinessOcStageWithStages() {
 
         sut.stages.put("foo", "develop");
 
@@ -402,7 +402,7 @@ class JenkinsfileGeneratorMojoTest {
                 "        \n" +
                 "                     try {\n" +
                 "                         catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {\n" +
-                "                             waitForReadiness('', { it.commitId == env.GIT_COMMIT })\n" +
+                "                             waitForReadiness()\n" +
                 "                         }\n" +
                 "                     } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {\n" +
                 "                         error \"Caught ${e.toString()}\"\n" +
@@ -413,6 +413,39 @@ class JenkinsfileGeneratorMojoTest {
                 "                     if (caughtException) {\n" +
                 "                         error caughtException.message\n" +
                 "                     }\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n", sut.fixupReadinessStage("@STAGES@"));
+    }
+
+    @Test
+    void fixupReadinessRestStageWithStages() {
+
+        sut.stages.put("foo", "develop");
+        sut.readinessEndpoint = "/api/actuator/info/git";
+
+        when(service.existsDockerfile(project)).thenReturn(true);
+
+        assertEquals("\n" +
+                "        stage('FOO (develop)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'foo'\n" +
+                "                NAMESPACE = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
+                "            }\n" +
+                "        \n" +
+                "            options {\n" +
+                "                timeout(time: 10, unit: 'MINUTES')\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                     waitForReadiness('/api/actuator/info/git', { it.commitId == env.GIT_COMMIT })\n" +
                 "                }\n" +
                 "            }\n" +
                 "        }\n", sut.fixupReadinessStage("@STAGES@"));

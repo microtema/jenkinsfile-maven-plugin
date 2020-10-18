@@ -16,21 +16,7 @@ stage(@STAGE_DISPLAY_NAME@) {
     steps {
 
         script {
-             Throwable caughtException = null
-
-             try {
-                 catchError(buildResult: 'SUCCESS', stageResult: 'ABORTED') {
-                     waitForReadiness(@ENDPOINT@, @CLOSURE@)
-                 }
-             } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
-                 error "Caught ${e.toString()}"
-             } catch (Throwable e) {
-                 caughtException = e
-             }
-
-             if (caughtException) {
-                 error caughtException.message
-             }
+             waitForReadiness(@ENDPOINT@, @CLOSURE@)
         }
     }
 }

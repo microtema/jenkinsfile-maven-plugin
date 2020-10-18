@@ -26,6 +26,7 @@ import java.util.Optional;
 public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
     static final String STAGES_TAG = "@STAGES@";
+    static final String CLOSURE_TAG = "@CLOSURE@";
     static final String FUNCTIONS_TAG = "@FUNCTIONS@";
     static final String STAGE_NAME = "@STAGE_NAME@";
     static final String ENDPOINT = "@ENDPOINT@";
@@ -422,6 +423,12 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         }
 
         String functionTemplate = getJenkinsStage("readiness-functions");
+        String templateName = "readiness-stage";
+
+        if (StringUtils.isEmpty(readinessEndpoint)) {
+            functionTemplate = getJenkinsStage("readiness-functions-oc");
+            templateName = "readiness-stage-oc";
+        }
 
         functionTemplates.add(functionTemplate);
 
@@ -441,11 +448,11 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                         .replace("$STAGE_NAME", stageName.toLowerCase())
                         .replace("$CLUSTER_URL", clusterUrl);
 
-                String stageTemplate = getJenkinsStage("readiness-stage")
+                String stageTemplate = getJenkinsStage(templateName)
                         .replaceAll(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, branchPatter))
                         .replaceAll(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
                         .replaceAll(ENDPOINT, maskEnvironmentVariable(endpoint))
-                        .replaceAll("@CLOSURE@", Optional.ofNullable(readinessClosure).orElse("{ it.commitId == env.GIT_COMMIT }"))
+                        .replaceAll(CLOSURE_TAG, Optional.ofNullable(readinessClosure).orElse("{ it.commitId == env.GIT_COMMIT }"))
                         .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
                 body.append(paddLine(stageTemplate, 8));
 
