@@ -169,20 +169,6 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     }
 
     void initDefaults() {
-        /*
-         * NOTE: keys should match DB instances
-         */
-        if (stages.isEmpty()) {
-            stages.put("etu", "develop,feature-*");
-            stages.put("itu", "release-*,hotfix-*,master");
-            stages.put("satu", "master");
-        }
-
-        if (clusters.isEmpty()) {
-            clusters.put("etu", "test-ekad-caas1.rz.bankenit.de");
-            clusters.put("itu", "test-ekad-caas1.rz.bankenit.de");
-            clusters.put("satu", "satu-ekad-caas1.rz.bankenit.de");
-        }
 
         if (readiness && StringUtils.isEmpty(readinessClosure)) {
             readinessEndpoint = Optional.ofNullable(readinessEndpoint).orElse("/" + appName + "/actuator/info/git");
