@@ -2,6 +2,7 @@ package de.microtema.maven.plugin.jenkinfile;
 
 
 import edu.emory.mathcs.backport.java.util.Collections;
+import junit.framework.Assert;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.project.MavenProject;
 import org.junit.jupiter.api.AfterEach;
@@ -12,7 +13,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
 import java.util.Arrays;
 import java.util.Properties;
 
@@ -190,7 +194,7 @@ class JenkinsfileGeneratorMojoTest {
 
         String answer = sut.buildTriggers();
 
-        assertEquals("triggers {\n" +
+        assertLinesEqual("triggers {\n" +
                 "    upstream upstreamProjects: \"\", threshold: hudson.model.Result.SUCCESS\n" +
                 "}\n", answer);
     }
@@ -202,7 +206,7 @@ class JenkinsfileGeneratorMojoTest {
 
         String answer = sut.buildTriggers();
 
-        assertEquals("triggers {\n" +
+        assertLinesEqual("triggers {\n" +
                 "    upstream upstreamProjects: \"foo/${env.BRANCH_NAME.replaceAll('/', '%2F')}\", threshold: hudson.model.Result.SUCCESS\n" +
                 "}\n", answer);
     }
@@ -214,7 +218,7 @@ class JenkinsfileGeneratorMojoTest {
 
         String answer = sut.buildTriggers();
 
-        assertEquals("triggers {\n" +
+        assertLinesEqual("triggers {\n" +
                 "    upstream upstreamProjects: \"foo/${env.BRANCH_NAME.replaceAll('/', '%2F')},bar/${env.BRANCH_NAME.replaceAll('/', '%2F')}\", threshold: hudson.model.Result.SUCCESS\n" +
                 "}\n", answer);
     }
@@ -271,7 +275,7 @@ class JenkinsfileGeneratorMojoTest {
 
         String answer = sut.getJenkinsStage("environment");
 
-        assertEquals("environment {\n" +
+        assertLinesEqual("environment {\n" +
                 "    CURRENT_TIME = sh(script: 'date +%Y-%m-%d-%H-%M', returnStdout: true).trim()\n" +
                 "    CHANGE_AUTHOR_EMAIL = sh(script: \"git --no-pager show -s --format='%ae'\", returnStdout: true).trim()\n" +
                 "\n" +
@@ -287,13 +291,13 @@ class JenkinsfileGeneratorMojoTest {
 
         String answer = sut.getJenkinsStage("environment");
 
-        assertEquals("environment {\n" +
+        assertLinesEqual("environment {\n" +
                 "    CURRENT_TIME = sh(script: 'date +%Y-%m-%d-%H-%M', returnStdout: true).trim()\n" +
                 "    CHANGE_AUTHOR_EMAIL = sh(script: \"git --no-pager show -s --format='%ae'\", returnStdout: true).trim()\n" +
                 "    APP = 'app'\n" +
                 "    BASE_NAMESPACE = 'ns'\n" +
                 "    DEPLOYABLE = sh(script: 'oc whoami', returnStdout: true).trim().startsWith(\"system:serviceaccount:${env.BASE_NAMESPACE}\")\n" +
-                "}\n",answer);
+                "}\n", answer);
     }
 
     @Test
@@ -301,7 +305,7 @@ class JenkinsfileGeneratorMojoTest {
 
         String answer = sut.getJenkinsStage("initialize");
 
-        assertEquals("stage('Initialize') {\n" +
+        assertLinesEqual("stage('Initialize') {\n" +
                 "\n" +
                 "    environment {\n" +
                 "        BOOTSTRAP_URL = ''\n" +
@@ -315,7 +319,7 @@ class JenkinsfileGeneratorMojoTest {
                 "        sh 'echo commit-id: $GIT_COMMIT'\n" +
                 "        sh 'echo change author: $CHANGE_AUTHOR_EMAIL'\n" +
                 "    }\n" +
-                "}\n",answer);
+                "}\n", answer);
     }
 
     @Test
@@ -325,7 +329,7 @@ class JenkinsfileGeneratorMojoTest {
 
         String answer = sut.getJenkinsStage("initialize");
 
-        assertEquals("stage('Initialize') {\n" +
+        assertLinesEqual("stage('Initialize') {\n" +
                 "\n" +
                 "    environment {\n" +
                 "        BOOTSTRAP_URL = 'localhost'\n" +
@@ -369,7 +373,168 @@ class JenkinsfileGeneratorMojoTest {
 
         when(service.existsDockerfile(project)).thenReturn(true);
 
-        assertEquals("template", sut.fixupReadinessStage("template"));
+        sut.readinessEndpoint = "/api/actuator/info/git";
+
+        sut.stages.put("dev", "develop,feature-*");
+        sut.stages.put("qa", "release-*,hotfix-*,master");
+        sut.stages.put("prod", "master");
+
+        sut.clusters.put("dev", "test-microtema.de");
+        sut.clusters.put("qa", "test-microtema.de");
+        sut.clusters.put("prod", "prod-microtema.de");
+
+        sut.initDefaults();
+
+        String answer = sut.getJenkinsStage("readiness");
+
+        assertLinesEqual("stage('Readiness Probe') {\n" +
+                "\n" +
+                "    when {\n" +
+                "        environment name: 'DEPLOYABLE', value: 'true'\n" +
+                "    }\n" +
+                "\n" +
+                "    parallel {\n" +
+                "\n" +
+                "        stage('DEV (develop)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'dev'\n" +
+                "                NAMESPACE = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
+                "            }\n" +
+                "        \n" +
+                "            options {\n" +
+                "                timeout(time: 10, unit: 'MINUTES')\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                     waitForReadiness(\"https://ns-dev.test-microtema.de/api/actuator/info/git\", { it.commitId == env.GIT_COMMIT })\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        stage('DEV (feature-*)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'dev'\n" +
+                "                NAMESPACE = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
+                "            }\n" +
+                "        \n" +
+                "            options {\n" +
+                "                timeout(time: 10, unit: 'MINUTES')\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'feature-*'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                     waitForReadiness(\"https://ns-dev-${env.BRANCH_NAME}.test-microtema.de/api/actuator/info/git\", { it.commitId == env.GIT_COMMIT })\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        stage('QA (release-*)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'qa'\n" +
+                "                NAMESPACE = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
+                "            }\n" +
+                "        \n" +
+                "            options {\n" +
+                "                timeout(time: 10, unit: 'MINUTES')\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'release-*'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                     waitForReadiness(\"https://ns-qa.test-microtema.de/api/actuator/info/git\", { it.commitId == env.GIT_COMMIT })\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        stage('QA (hotfix-*)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'qa'\n" +
+                "                NAMESPACE = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
+                "            }\n" +
+                "        \n" +
+                "            options {\n" +
+                "                timeout(time: 10, unit: 'MINUTES')\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'hotfix-*'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                     waitForReadiness(\"https://ns-qa.test-microtema.de/api/actuator/info/git\", { it.commitId == env.GIT_COMMIT })\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        stage('QA (master)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'qa'\n" +
+                "                NAMESPACE = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
+                "            }\n" +
+                "        \n" +
+                "            options {\n" +
+                "                timeout(time: 10, unit: 'MINUTES')\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'master'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                     waitForReadiness(\"https://ns-qa.test-microtema.de/api/actuator/info/git\", { it.commitId == env.GIT_COMMIT })\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        stage('PROD (master)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                STAGE_NAME = 'prod'\n" +
+                "                NAMESPACE = \"${env.BASE_NAMESPACE}-${env.STAGE_NAME}\"\n" +
+                "            }\n" +
+                "        \n" +
+                "            options {\n" +
+                "                timeout(time: 10, unit: 'MINUTES')\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'master'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                     waitForReadiness(\"https://ns-prod.prod-microtema.de/api/actuator/info/git\", { it.commitId == env.GIT_COMMIT })\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "    }\n" +
+                "}\n", answer);
     }
 
     @Test
@@ -426,7 +591,7 @@ class JenkinsfileGeneratorMojoTest {
 
         when(service.existsDockerfile(project)).thenReturn(true);
 
-        assertEquals("\n" +
+        assertLinesEqual("\n" +
                 "        stage('FOO (develop)') {\n" +
                 "        \n" +
                 "            environment {\n" +
@@ -445,7 +610,7 @@ class JenkinsfileGeneratorMojoTest {
                 "            steps {\n" +
                 "        \n" +
                 "                script {\n" +
-                "                     waitForReadiness('/api/actuator/info/git', { it.commitId == env.GIT_COMMIT })\n" +
+                "                     waitForReadiness(\"/api/actuator/info/git\", { it.commitId == env.GIT_COMMIT })\n" +
                 "                }\n" +
                 "            }\n" +
                 "        }\n", sut.fixupReadinessStage("@STAGES@"));
@@ -458,7 +623,7 @@ class JenkinsfileGeneratorMojoTest {
 
         when(service.existsDockerfile(project)).thenReturn(true);
 
-        assertEquals("stage('Deployment') {\n" +
+        assertLinesEqual("stage('Deployment') {\n" +
                 "\n" +
                 "    when {\n" +
                 "        environment name: 'DEPLOYABLE', value: 'true'\n" +
@@ -493,7 +658,7 @@ class JenkinsfileGeneratorMojoTest {
 
         when(service.existsDockerfile(project)).thenReturn(true);
 
-        assertEquals("stage('Deployment') {\n" +
+        assertLinesEqual("stage('Deployment') {\n" +
                 "\n" +
                 "    when {\n" +
                 "        environment name: 'DEPLOYABLE', value: 'true'\n" +
@@ -552,7 +717,7 @@ class JenkinsfileGeneratorMojoTest {
 
         when(service.existsDbMigrationScripts(project)).thenReturn(true);
 
-        assertEquals("stage('DB Migration') {\n" +
+        assertLinesEqual("stage('DB Migration') {\n" +
                 "\n" +
                 "    when {\n" +
                 "        environment name: 'DEPLOYABLE', value: 'true'\n" +
@@ -671,7 +836,7 @@ class JenkinsfileGeneratorMojoTest {
 
         String answer = sut.getJenkinsStage("agent");
 
-        assertEquals("agent {\n" +
+        assertLinesEqual("agent {\n" +
                 "    label 'jdk8'\n" +
                 "}\n", answer);
     }
@@ -959,5 +1124,39 @@ class JenkinsfileGeneratorMojoTest {
                 "    }\n" +
                 "}\n" +
                 "\n", sut.getJenkinsStage("regression-test"));
+    }
+
+    static void assertLinesEqual(String expectedString, String actualString) {
+
+        BufferedReader expectedLinesReader = new BufferedReader(new StringReader(expectedString));
+        BufferedReader actualLinesReader = new BufferedReader(new StringReader(actualString));
+
+        try {
+            int lineNumber = 0;
+
+            String actualLine;
+            while ((actualLine = actualLinesReader.readLine()) != null) {
+                String expectedLine = expectedLinesReader.readLine();
+                Assert.assertEquals("Line " + lineNumber, expectedLine, actualLine);
+                lineNumber++;
+            }
+
+            if (expectedLinesReader.readLine() != null) {
+                Assert.fail("Actual string does not contain all expected lines");
+            }
+        } catch (IOException e) {
+            Assert.fail(e.getMessage());
+        } finally {
+            try {
+                expectedLinesReader.close();
+            } catch (IOException e) {
+                Assert.fail(e.getMessage());
+            }
+            try {
+                actualLinesReader.close();
+            } catch (IOException e) {
+                Assert.fail(e.getMessage());
+            }
+        }
     }
 }

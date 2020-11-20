@@ -169,6 +169,20 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
     }
 
     void initDefaults() {
+        /*
+         * NOTE: keys should match DB instances
+         */
+        if (stages.isEmpty()) {
+            stages.put("etu", "develop,feature-*");
+            stages.put("itu", "release-*,hotfix-*,master");
+            stages.put("satu", "master");
+        }
+
+        if (clusters.isEmpty()) {
+            clusters.put("etu", "test-ekad-caas1.rz.bankenit.de");
+            clusters.put("itu", "test-ekad-caas1.rz.bankenit.de");
+            clusters.put("satu", "satu-ekad-caas1.rz.bankenit.de");
+        }
 
         if (readiness && StringUtils.isEmpty(readinessClosure)) {
             readinessEndpoint = Optional.ofNullable(readinessEndpoint).orElse("/" + appName + "/actuator/info/git");
@@ -431,15 +445,15 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
                 String endpoint = StringUtils.trimToEmpty(readinessEndpoint)
                         .replace("$BASE_NAMESPACE", baseNamespace)
-                        .replace("$STAGE_NAME", stageName.toLowerCase())
+                        .replace("$STAGE_NAME", getStagePath(stageName, branchPatter))
                         .replace("$CLUSTER_URL", clusterUrl);
 
                 String stageTemplate = getJenkinsStage(templateName)
                         .replaceAll(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, branchPatter))
                         .replaceAll(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
-                        .replaceAll(ENDPOINT, maskEnvironmentVariable(endpoint))
-                        .replaceAll(CLOSURE_TAG, Optional.ofNullable(readinessClosure).orElse("{ it.commitId == env.GIT_COMMIT }"))
-                        .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
+                        .replace(ENDPOINT, maskEnvironmentVariable(endpoint, "\""))
+                                .replaceAll(CLOSURE_TAG, Optional.ofNullable(readinessClosure).orElse("{ it.commitId == env.GIT_COMMIT }"))
+                                .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
                 body.append(paddLine(stageTemplate, 8));
 
                 body.append("\n");
@@ -448,6 +462,15 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         }
 
         return template.replace(STAGES_TAG, body.toString());
+    }
+
+    String getStagePath(String stageName, String branchPatter) {
+
+        if (branchPatter.equalsIgnoreCase("feature-*")) {
+            return stageName.toLowerCase() + "-${env.BRANCH_NAME}";
+        }
+
+        return stageName.toLowerCase();
     }
 
     String fixupDeploymentStage(String template) {
@@ -726,10 +749,14 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return null;
     }
 
+    String maskEnvironmentVariable(String value, String mask) {
+
+        return mask + (value != null ? value : "") + mask;
+    }
 
     String maskEnvironmentVariable(String value) {
 
-        return "'" + (value != null ? value : "") + "'";
+        return maskEnvironmentVariable(value, "'");
     }
 
     String getJenkinsStage(String templateName) {
