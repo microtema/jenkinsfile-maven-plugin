@@ -1,7 +1,11 @@
-# jenkinsfile generator
+# maven jenkinsfile generator
 Reducing Boilerplate Code with jenkinnsfile maven plugin
 > More Time for Feature and functionality
   Through a simple set of jenkinsfile templates and saving 60% of development time 
+
+## Requirement
+* Maven Project
+* Packaging: pom, jar (maven-artifact, microservice)
 
 ## Key Features
 * Auto generate by maven compile phase
@@ -16,7 +20,7 @@ Reducing Boilerplate Code with jenkinnsfile maven plugin
 | Property | Type | Default Value | Required |Description |
 | --- | --- | --- | --- | --- |
 | appName | String | ${project.artifactId} | True |Specifying maven project artifactId |
-| baseNamespace | String | Empty | True | Specifying maven project artifactId |
+| baseNamespace | String | Empty | True | Specifying cloud platform namespace |
 | upstreamProjects | CSV | Empty | True | Specifying upstream projects |
 | downstreamProjects | CSV | Empty | True | Specifying downstream projects |
 | stages | Map<String,CSV> | Empty | True | Specifying dev/qa/pre stages for branches, one stage may contains multiple branches |
@@ -56,7 +60,7 @@ Reducing Boilerplate Code with jenkinnsfile maven plugin
 </plugins>
 ```
 
-## How to excludes downStream projects
+## How to excludes downStream projects on specific branch
 
 ```
 <configuration>
