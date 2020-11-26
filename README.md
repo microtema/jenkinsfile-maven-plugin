@@ -12,8 +12,21 @@ Reducing Boilerplate Code with jenkinnsfile maven plugin
 * Auto Sonar report detector by adding "Sonar Report" stage
 * Auto Deployment to Cloud Platform by adding "Deployment" stage
 
+## Properties
+| Property | Type | Default Value | Required |Description |
+| --- | --- | --- | --- | --- |
+| appName | String | ${project.artifactId} | True |Specifying maven project artifactId |
+| baseNamespace | String | Empty | True | Specifying maven project artifactId |
+| upstreamProjects | CSV | Empty | True | Specifying upstream projects |
+| downstreamProjects | CSV | Empty | True | Specifying downstream projects |
+| stages | Map<String,CSV> | Empty | True | Specifying dev/qa/pre stages for branches, one stage may contains multiple branches |
+| prodStages | CSV | Empty | True | Specifying production stages |
+| readinessEndpoint | String | Empty | False | Specifying microservice REST Endpoint for Readiness Check |
+| readiness | Boolean | false | False | Enable/Disable "Readiness Check" stage |
+| sonar | Boolean | false | False | Enable/Disable "Sonar Reports" stage |
+| update | Boolean | true | True | Update Jenkinsfile  |
 
-## How to use
+## How to configure pom.xml
 
 ```
 <properties>
@@ -41,6 +54,80 @@ Reducing Boilerplate Code with jenkinnsfile maven plugin
         </executions>
     </plugin>
 </plugins>
+```
+
+## How to excludes downStream projects
+
+```
+<configuration>
+    ...
+    <stages>
+        <dev>develop</dev>
+        <qa>release-*</qa>
+        <pre-prod>master</pre-prod>
+    </stages>
+    <downstreamProjects>e2e:!develop</downstreamProjects>
+    ...
+</configuration>
+```
+
+## Output without develop stage
+
+```
+...
+stage('Regression Tests') {
+
+    parallel {
+
+        stage('QA (e2e/release-*)') {
+        
+            environment {
+                JOB_NAME = 'e2e'
+                STAGE_NAME = 'qa'
+                VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()
+            }
+        
+            when {
+                branch 'release-*'
+            }
+        
+            steps {
+        
+                script {
+                    triggerJob "../${env.JOB_NAME}/${env.BRANCH_NAME}"
+                }
+            }
+        }
+
+        stage('PRE-PROD (e2e/master)') {
+        
+            environment {
+                JOB_NAME = 'e2e'
+                STAGE_NAME = 'pre-prod'
+                VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()
+            }
+        
+            when {
+                branch 'master'
+            }
+        
+            steps {
+        
+                script {
+                    triggerJob "../${env.JOB_NAME}/${env.BRANCH_NAME}"
+                }
+            }
+        }
+
+    }
+}
+...
+```
+
+## How to execute maven goal
+
+```
+mvn compile
 ```
 
 ## Output 
