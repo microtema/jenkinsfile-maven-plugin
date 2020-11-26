@@ -17,7 +17,7 @@ Reducing Boilerplate Code with jenkinnsfile maven plugin
 * Auto Deployment to Cloud Platform by adding "Deployment" stage
 
 ## Properties
-| Property | Type | Default Value | Required |Description |
+| Property | Type | Default Value | Required | Description |
 | --- | --- | --- | --- | --- |
 | appName | String | ${project.artifactId} | True |Specifying maven project artifactId |
 | baseNamespace | String | Empty | True | Specifying cloud platform namespace |
