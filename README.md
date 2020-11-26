@@ -15,6 +15,8 @@ Reducing Boilerplate Code with jenkinnsfile maven plugin
 * Auto Maven artifact detector by adding "Deploy Maven Artifact" stage
 * Auto Sonar report detector by adding "Sonar Report" stage
 * Auto Deployment to Cloud Platform by adding "Deployment" stage
+* Auto DB Migration (flyway) detector by adding "DB Migration" stage
+* Auto Last Test (jmeter) detector by adding "Last Tests" stage
 
 ## Properties
 | Property | Type | Default Value | Required | Description |
