@@ -16,11 +16,15 @@ import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Mojo(name = "generate", defaultPhase = LifecyclePhase.COMPILE)
 public class JenkinsfileGeneratorMojo extends AbstractMojo {
@@ -452,8 +456,8 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
                         .replaceAll(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, branchPatter))
                         .replaceAll(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
                         .replace(ENDPOINT, maskEnvironmentVariable(endpoint, "\""))
-                                .replaceAll(CLOSURE_TAG, Optional.ofNullable(readinessClosure).orElse("{ it.commitId == env.GIT_COMMIT }"))
-                                .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
+                        .replaceAll(CLOSURE_TAG, Optional.ofNullable(readinessClosure).orElse("{ it.commitId == env.GIT_COMMIT }"))
+                        .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
                 body.append(paddLine(stageTemplate, 8));
 
                 body.append("\n");
@@ -609,7 +613,13 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         return body.toString();
     }
 
-    String fixupRegressionTestStageImpl(String template, String downstreamProject, String stageDisplayName) {
+    String fixupRegressionTestStageImpl(String template, String downstreamProjectPattern, String stageDisplayName) {
+
+        String[] downstreamProjectToken = downstreamProjectPattern.split(":");
+        String downstreamProject = downstreamProjectToken[0];
+        String includesExcludes = downstreamProjectToken.length == 1 ? StringUtils.EMPTY : downstreamProjectToken[1];
+        Set<String> includes = Stream.of(includesExcludes.split(",")).filter(StringUtils::isNotBlank).filter(it -> !it.startsWith("!")).collect(Collectors.toSet());
+        Set<String> excludes = Stream.of(includesExcludes.split(",")).filter(StringUtils::isNotBlank).filter(it -> it.startsWith("!")).map(it -> it.replaceFirst("!", StringUtils.EMPTY)).collect(Collectors.toSet());
 
         StringBuilder body = new StringBuilder();
 
@@ -617,15 +627,17 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
 
             String stageName = stage.getKey();
 
-            for (String branchPatter : getBranches(stage.getValue())) {
+            Collection<String> validBranches = getBranches(stage.getValue()).stream().filter(it -> isValidBranch(it, includes, excludes)).collect(Collectors.toList());
+
+            for (String branchPattern : validBranches) {
 
                 body.append("\n");
 
                 String stageTemplate = getJenkinsStage("regression-test-stage")
-                        .replace(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, downstreamProject + "/" + branchPatter))
+                        .replace(STAGE_DISPLAY_NAME, getStageDisplayName(stageName, downstreamProject + "/" + branchPattern))
                         .replace(STAGE_NAME, maskEnvironmentVariable(stageName.toLowerCase()))
                         .replace(JOB_NAME, maskEnvironmentVariable(downstreamProject.toLowerCase()))
-                        .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPatter));
+                        .replace(BRANCH_PATTERN, maskEnvironmentVariable(branchPattern));
                 body.append(paddLine(stageTemplate, 8));
 
                 body.append("\n");
@@ -633,6 +645,15 @@ public class JenkinsfileGeneratorMojo extends AbstractMojo {
         }
 
         return template.replace(STAGE_NAME, maskEnvironmentVariable(stageDisplayName)).replace(STAGES_TAG, body.toString());
+    }
+
+    boolean isValidBranch(String branchPattern, Set<String> includes, Set<String> excludes) {
+
+        if (excludes.contains(branchPattern)) {
+            return false;
+        }
+
+        return (includes.isEmpty() || includes.contains(branchPattern));
     }
 
     List<String> getBranches(String branches) {

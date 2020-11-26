@@ -1126,6 +1126,114 @@ class JenkinsfileGeneratorMojoTest {
                 "\n", sut.getJenkinsStage("regression-test"));
     }
 
+    @Test
+    void fixupRegressionTestStageMultipleWithIncludes() {
+
+        sut.downstreamProjects.add("e2e:develop");
+        sut.downstreamProjects.add("performance");
+
+        sut.stages.put("dev", "develop");
+
+        assertEquals("stage('Regression Tests (1)') {\n" +
+                "\n" +
+                "    parallel {\n" +
+                "\n" +
+                "        stage('DEV (e2e/develop)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                JOB_NAME = 'e2e'\n" +
+                "                STAGE_NAME = 'dev'\n" +
+                "                VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                    triggerJob \"../${env.JOB_NAME}/${env.BRANCH_NAME}\"\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "    }\n" +
+                "}\n" +
+                "\n" +
+                "stage('Regression Tests (2)') {\n" +
+                "\n" +
+                "    parallel {\n" +
+                "\n" +
+                "        stage('DEV (performance/develop)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                JOB_NAME = 'performance'\n" +
+                "                STAGE_NAME = 'dev'\n" +
+                "                VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                    triggerJob \"../${env.JOB_NAME}/${env.BRANCH_NAME}\"\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "    }\n" +
+                "}\n" +
+                "\n", sut.getJenkinsStage("regression-test"));
+    }
+
+    @Test
+    void fixupRegressionTestStageMultipleWithExludes() {
+
+        sut.downstreamProjects.add("e2e:!develop");
+        sut.downstreamProjects.add("performance");
+
+        sut.stages.put("dev", "develop");
+
+        assertEquals("stage('Regression Tests (1)') {\n" +
+                "\n" +
+                "    parallel {\n" +
+                "\n" +
+                "    }\n" +
+                "}\n" +
+                "\n" +
+                "stage('Regression Tests (2)') {\n" +
+                "\n" +
+                "    parallel {\n" +
+                "\n" +
+                "        stage('DEV (performance/develop)') {\n" +
+                "        \n" +
+                "            environment {\n" +
+                "                JOB_NAME = 'performance'\n" +
+                "                STAGE_NAME = 'dev'\n" +
+                "                VERSION = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout $MAVEN_ARGS', returnStdout: true).trim()\n" +
+                "            }\n" +
+                "        \n" +
+                "            when {\n" +
+                "                branch 'develop'\n" +
+                "            }\n" +
+                "        \n" +
+                "            steps {\n" +
+                "        \n" +
+                "                script {\n" +
+                "                    triggerJob \"../${env.JOB_NAME}/${env.BRANCH_NAME}\"\n" +
+                "                }\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "    }\n" +
+                "}\n" +
+                "\n", sut.getJenkinsStage("regression-test"));
+    }
+
     static void assertLinesEqual(String expectedString, String actualString) {
 
         BufferedReader expectedLinesReader = new BufferedReader(new StringReader(expectedString));
